@@ -170,3 +170,19 @@ ESRI, GEDI, NDVI y Almanaque Azul conservan su significado.
   pero no invalida ni vuelve a ejecutar el resultado analítico.
 - En pantallas estrechas las pestañas conservan un área de interacción de 48 px y el panel
   vuelve al ancho adaptable definido para móviles.
+
+## Paridad directa con el HTML 5.3
+
+- `portal_html.py` reproduce el encabezado, logotipo, navegación, botones, portada,
+  metadatos, tipografía DM Sans y corte diagonal del HTML entregado.
+- La vista cartográfica conserva las medidas del original: navegación de 118 px, panel
+  de capas de 340 px, mapa central y resultados laterales visibles solo después de
+  ejecutar la preevaluación.
+- Los grupos de fuentes continúan siendo controles Streamlit para conservar el análisis
+  vigente, pero adoptan el fondo, radio, tipografía y espaciado de `.lg`, `.ly` y
+  `.side-tabs` del portal.
+- La referencia visual del HTML prevalece sobre cualquier sistema generado previamente.
+  La validación UX se limita a foco visible, contraste, áreas táctiles, reducción de
+  movimiento y respuesta móvil; no modifica el diseño elegido.
+- El grupo Límites usa los GeoJSON incluidos en el paquete: cuenca activa por defecto y
+  subcuencas opcionales, sin consultas a assets vectoriales privados.

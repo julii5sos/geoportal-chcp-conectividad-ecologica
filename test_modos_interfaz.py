@@ -95,24 +95,19 @@ class ModosInterfazTests(unittest.TestCase):
         app = AppTest.from_file("app.py", default_timeout=30).run()
 
         self.assertFalse(app.exception)
-        self.assertEqual(
-            [boton.label for boton in app.button],
-            [
-                "Elegir preevaluación territorial",
-                "Elegir corredores y conectividad",
-                "Elegir preevaluación integral",
-            ],
-        )
+        html_portada = "\n".join(bloque.value for bloque in app.markdown)
+        self.assertIn('class="ref-mode-cards"', html_portada)
+        self.assertIn("Preevaluación territorial", html_portada)
+        self.assertIn("Corredores y conectividad", html_portada)
+        self.assertIn("Preevaluación integral", html_portada)
+        for modo in ("territorial", "corredores", "integral"):
+            self.assertIn(f"seccion=mapa&amp;modo={modo}", html_portada)
 
     def test_navegacion_explica_objetivo_y_metodo_sin_iniciar_el_motor(self):
         app = AppTest.from_file("app.py", default_timeout=30).run()
 
-        self.assertEqual(
-            app.segmented_control[0].options,
-            ["Mapa", "Metodología y ayuda", "Acerca del visor"],
-        )
-
-        app.segmented_control[0].set_value("Metodología y ayuda").run()
+        app.query_params["seccion"] = "metodo"
+        app.run()
         self.assertFalse(app.exception)
         self.assertTrue(
             any(
@@ -122,7 +117,8 @@ class ModosInterfazTests(unittest.TestCase):
         )
         self.assertTrue(any(boton.label == "Abrir el mapa" for boton in app.button))
 
-        app.segmented_control[0].set_value("Acerca del visor").run()
+        app.query_params["seccion"] = "acerca"
+        app.run()
         self.assertFalse(app.exception)
         self.assertTrue(
             any("Qué problema ayuda a resolver" in bloque.value for bloque in app.markdown)
@@ -133,7 +129,7 @@ class ModosInterfazTests(unittest.TestCase):
         codigo = Path("app.py").read_text(encoding="utf-8")
 
         self.assertNotIn('SECCION_ANALISIS = "Análisis"', codigo)
-        bloque_navegacion = codigo.index('seccion_tablero = st.segmented_control(')
+        bloque_navegacion = codigo.index("mostrar_cabecera_portal(seccion_tablero)")
         bloque_modo = codigo.index('if modo_analisis is None:')
         bloque_aplicacion = codigo.index('APLICACION_ACTIVA =', bloque_modo)
 
@@ -193,7 +189,7 @@ class ModosInterfazTests(unittest.TestCase):
         self.assertIn("Volver al mapa", codigo)
         self.assertIn('st.session_state["mostrar_resultados"] = False', codigo)
         self.assertIn(
-            "El resultado aparece debajo del mapa, que conserva el ancho completo",
+            "El resultado aparece en el panel lateral derecho, como en el portal HTML",
             codigo,
         )
         self.assertIn("Evolución por fuente", codigo)
@@ -210,19 +206,20 @@ class ModosInterfazTests(unittest.TestCase):
     def test_modelo_html_conserva_el_analisis_y_declara_su_identidad(self):
         portada = Path("app.py").read_text(encoding="utf-8")
         visor = Path("app_experiencia.py").read_text(encoding="utf-8")
+        portal = Path("portal_html.py").read_text(encoding="utf-8")
 
         self.assertIn("mostrar_cabecera_portal", portada)
-        self.assertIn("Visor CHCP", portada)
-        self.assertIn("Google Earth Engine", portada)
-        self.assertIn("WGS 84 · EPSG:4326", portada)
-        self.assertIn("#0a4393", portada.lower())
-        self.assertIn("#77cc09", portada.lower())
-        self.assertIn('APP_VERSION = "UX-5.2-PLATAFORMA-HTML"', visor)
-        self.assertNotIn("st.columns([2.55, 1]", visor)
+        self.assertIn("Conectividad Panamá", portal)
+        self.assertIn("Google Earth Engine", portal)
+        self.assertIn("WGS 84 · EPSG:4326", portal)
+        self.assertIn("#0a4393", portal.lower())
+        self.assertIn("#77cc09", portal.lower())
+        self.assertIn('APP_VERSION = "UX-5.3-HTML-EXACTO-LIMITES-LOCALES"', visor)
+        self.assertIn("st.columns([3, 1]", visor)
         self.assertIn("height=780", visor)
         self.assertIn("tipo_area = panel_filtros.selectbox", visor)
-        self.assertIn("mapa_resultados_contenedor = st.container", visor)
-        self.assertIn('["Capas", "Filtros", "Mapa base"]', visor)
+        self.assertIn('key="mapa_portal"', visor)
+        self.assertIn('["Capas", "Polígono", "Mapa base"]', visor)
         self.assertIn('key="acciones_sidebar"', visor)
         self.assertIn('"Realizar análisis"', visor)
         self.assertIn('"Resultados"', visor)
@@ -230,6 +227,8 @@ class ModosInterfazTests(unittest.TestCase):
         self.assertIn('"Mapa claro"', visor)
         self.assertIn('"OpenStreetMap"', visor)
         self.assertIn("agregar_mapa_base(mapa, mapa_base", visor)
+        self.assertIn("agregar_subcuencas_local", visor)
+        self.assertIn("agregar_limite_cuenca_local", visor)
         self.assertIn('[data-collapsed="true"]', visor)
         self.assertIn("width: 0 !important", visor)
         self.assertIn("flex-basis: 0 !important", visor)

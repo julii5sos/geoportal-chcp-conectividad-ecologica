@@ -4,6 +4,20 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
+## [5.3.0] - 2026-11-01 — diseño exacto del portal y límites locales
+
+- Sustituye la interpretación visual anterior por la composición del HTML entregado:
+  encabezado azul de dos niveles, marca Conectividad Panamá, navegación institucional,
+  portada con corte diagonal, panel de 340 px, mapa central y resultados laterales.
+- Cambia las pestañas del panel a **Capas**, **Polígono** y **Mapa base**, con la acción
+  principal fija al pie como en la plataforma de referencia.
+- Incorpora `area_estudio.geojson` y `subcuencas_canal.geojson` del portal; la cuenca y
+  las 53 subcuencas ya no dependen de assets privados de Earth Engine.
+- Añade el grupo **Límites** para encender la cuenca y las subcuencas locales, con
+  identificación por nombre, grupo y superficie.
+- Mantiene el ERI indicativo, los análisis satelitales, corredores, fragmentación,
+  gráficas, informes y descargas existentes.
+
 ## [5.2.0] - 2026-11-01 — panel de la plataforma HTML
 
 - Adapta la estructura funcional del portal HTML al panel lateral de Streamlit con

@@ -13,6 +13,12 @@ from metodologia_indice import (
     UMBRALES_INDICE,
 )
 from modos_app import MODO_INTEGRAL, MODOS_ANALISIS
+from portal_html import (
+    inyectar_estilo_portal,
+    mostrar_hero_inicio,
+    mostrar_navegacion_portal,
+    mostrar_tarjetas_modos,
+)
 
 
 st.set_page_config(
@@ -138,41 +144,28 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# La referencia entregada por la usuaria prevalece sobre el estilo histórico.
+inyectar_estilo_portal()
 
-def mostrar_cabecera_portal():
-    st.markdown(
-        """
-        <header class="portal-nav" aria-label="Identificación del visor CHCP">
-          <div class="portal-marca">
-            <span class="portal-logo" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 6.5 9 3l6 3 5-2.5v13L15 20l-6-3-5 3z"/>
-                <path d="M9 3v14M15 6v14"/>
-                <path d="M6.5 10.5c2-1.6 3.5 1.4 5.5 0s3.5 1.4 5.5 0"/>
-              </svg>
-            </span>
-            <span><strong>Visor CHCP</strong><small>Preevaluación territorial y conectividad</small></span>
-          </div>
-          <div class="portal-util">
-            <span class="portal-chip acento">Resultado indicativo</span>
-            <span class="portal-chip">ERI complementario</span>
-            <span class="portal-chip">Google Earth Engine</span>
-            <span class="portal-chip">WGS 84 · EPSG:4326</span>
-          </div>
-        </header>
-        """,
-        unsafe_allow_html=True,
-    )
+
+def mostrar_cabecera_portal(seccion=SECCION_MAPA):
+    mostrar_navegacion_portal(seccion)
 
 
 def elegir_modo(modo):
     st.session_state["modo_analisis"] = modo
     st.session_state["seccion_tablero"] = SECCION_MAPA
     st.session_state["mostrar_resultados"] = False
+    st.query_params["seccion"] = "mapa"
 
 
 def abrir_vista(vista):
     st.session_state["seccion_tablero"] = vista
+    st.query_params["seccion"] = {
+        SECCION_MAPA: "mapa",
+        SECCION_METODO: "metodo",
+        SECCION_ACERCA: "acerca",
+    }.get(vista, "mapa")
     if vista == SECCION_MAPA:
         st.session_state["mostrar_resultados"] = False
 
@@ -444,20 +437,30 @@ def mostrar_acerca():
 
 
 if st.session_state.get("seccion_tablero") == "Análisis":
-    # Migra sesiones abiertas con la navegación anterior.
     st.session_state["seccion_tablero"] = SECCION_MAPA
 
-if st.session_state.get("modo_analisis") not in MODOS_ANALISIS:
-    mostrar_cabecera_portal()
+seccion_consulta = str(st.query_params.get("seccion", "")).strip().lower()
+modo_consulta = str(st.query_params.get("modo", "")).strip().lower()
+if modo_consulta in MODOS_ANALISIS:
+    st.session_state["modo_analisis"] = modo_consulta
+    st.session_state["seccion_tablero"] = SECCION_MAPA
+    st.session_state["mostrar_resultados"] = False
+if seccion_consulta == "inicio":
+    st.session_state.pop("modo_analisis", None)
+    st.session_state["seccion_tablero"] = SECCION_MAPA
+elif seccion_consulta in {"mapa", "plataforma"}:
+    st.session_state["seccion_tablero"] = SECCION_MAPA
+elif seccion_consulta in {"metodo", "datos"}:
+    st.session_state["seccion_tablero"] = SECCION_METODO
+elif seccion_consulta in {"acerca", "faq"}:
+    st.session_state["seccion_tablero"] = SECCION_ACERCA
 
-seccion_tablero = st.segmented_control(
-    "Navegación principal",
-    SECCIONES_PRINCIPALES,
-    default=SECCION_MAPA,
-    key="seccion_tablero",
-    label_visibility="collapsed",
-    width="stretch",
-)
+seccion_tablero = st.session_state.get("seccion_tablero", SECCION_MAPA)
+if seccion_tablero not in SECCIONES_PRINCIPALES:
+    seccion_tablero = SECCION_MAPA
+    st.session_state["seccion_tablero"] = seccion_tablero
+
+mostrar_cabecera_portal(seccion_tablero)
 
 seccion_anterior = st.session_state.get("_seccion_publica_anterior")
 if (
@@ -481,42 +484,8 @@ if modo_analisis not in MODOS_ANALISIS:
     modo_analisis = None
 
 if modo_analisis is None:
-
-    mostrar_cabecera(
-        "Visor territorial y de conectividad",
-        "Seleccione el análisis que desea abrir en el tablero cartográfico.",
-        "Después podrá elegir el área, activar capas por fuente, crear el análisis y "
-        "consultar los resultados sin recorrer una guía extensa.",
-        "Resultado indicativo · requiere interpretación y verificación de campo",
-    )
-    st.markdown('<h2 class="pregunta">¿Qué desea preevaluar?</h2>', unsafe_allow_html=True)
-    columnas = st.columns(3)
-    for columna, (modo, contenido) in zip(columnas, MODOS_ANALISIS.items()):
-        with columna:
-            with st.container(border=True):
-                st.markdown(
-                    f"""
-                    <div class="tarjeta">
-                      <small>{contenido['pregunta']}</small>
-                      <h3>{contenido['titulo']}</h3>
-                      <p>{contenido['descripcion']}</p>
-                      <div class="resultado"><b>Recibirá:</b> {contenido['resultado']}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                st.button(
-                    f"Elegir {contenido['titulo'].lower()}",
-                    key=f"elegir-modo-{modo}",
-                    type="primary" if modo == MODO_INTEGRAL else "secondary",
-                    width="stretch",
-                    on_click=elegir_modo,
-                    args=(modo,),
-                )
-    st.info(
-        "Puede consultar «Metodología y ayuda» o «Acerca del visor» sin iniciar el motor. "
-        "Earth Engine se conectará solo después de elegir una preevaluación."
-    )
+    mostrar_hero_inicio()
+    mostrar_tarjetas_modos(MODOS_ANALISIS)
     st.stop()
 
 

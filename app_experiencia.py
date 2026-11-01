@@ -91,6 +91,17 @@ from modos_app import (
     area_debe_recortarse_a_cuenca,
 )
 from reporte_cartografico import crear_mapa_conectividad, crear_mapa_fragmentacion
+from portal_html import inyectar_estilo_portal
+from territorio_local import (
+    FUENTE_CUENCA,
+    FUENTE_SUBCUENCAS,
+    coleccion_cuenca,
+    coleccion_subcuencas,
+    geometria_cuenca,
+    geometria_subcuenca,
+    huella_territorial,
+    nombres_subcuencas,
+)
 
 
 if not st.session_state.get("_pagina_configurada"):
@@ -1082,6 +1093,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# El CSS del HTML entregado es la fuente visual final y prevalece sobre los
+# estilos históricos que aún usan componentes internos de la aplicación.
+inyectar_estilo_portal()
+
 
 # -----------------------------------------------------------------------------
 # Configuración centralizada
@@ -1097,7 +1112,7 @@ def secreto_opcional(nombre, predeterminado=None):
         return predeterminado
 
 
-APP_VERSION = "UX-5.2-PLATAFORMA-HTML"
+APP_VERSION = "UX-5.3-HTML-EXACTO-LIMITES-LOCALES"
 
 MAPAS_BASE = {
     "Imagen satelital": {
@@ -1158,12 +1173,7 @@ VALOR_COBERTURA_BOSQUE_2021 = "Bosques y Otras Tierras Boscosas"
 RADIO_BUSQUEDA_CORREDOR_M = 5_000
 TOLERANCIA_GEOMETRIA_CONECTIVIDAD_M = 10
 
-ASSET_CUENCA = (
-    "projects/ee-julissaguevaravega/assets/"
-    "CuencasHidrograficadeInteres"
-)
 ASSET_FINCAS = secreto_opcional("EE_ASSET_FINCAS")
-ASSET_SUBCUENCAS = secreto_opcional("EE_ASSET_SubCuencas")
 ASSET_BOSQUE_2021 = secreto_opcional("EE_ASSET_BOSQUE_2021")
 ACCESO_FINCA_DURACION_SEG = 30 * 60
 ACCESO_FINCA_MAX_INTENTOS = 5
@@ -1532,29 +1542,35 @@ def construir_registro_metodologico(
             "identificador": str(finca_id),
             "geometria_vectorial_incluida": False,
             "fuente": "coleccion_privada_configurada_en_el_servidor",
-            "recorte": ASSET_CUENCA,
+            "recorte": FUENTE_CUENCA,
         }
     elif tipo_area == TIPO_AREA_SUBCUENCA:
         especificacion_area = {
             "tipo": "subcuenca",
             "identificador": str(subcuenca_nombre),
-            "asset": ASSET_SUBCUENCAS,
-            "campo_identificador": "SUBCUENC_2",
-            "geometria_vectorial_incluida": False,
-            "recorte": ASSET_CUENCA,
+            "fuente": FUENTE_SUBCUENCAS,
+            "geometria_vectorial_incluida": True,
+            "geojson": geometria_subcuenca(subcuenca_nombre),
+            "recorte": FUENTE_CUENCA,
         }
     elif tipo_area == TIPO_AREA_DIBUJADA:
         especificacion_area = {
             "tipo": "poligono_dibujado",
             "geojson": json.loads(geometria_geojson),
-            "recorte": ASSET_CUENCA,
+            "recorte": FUENTE_CUENCA,
         }
     else:
-        especificacion_area = {"tipo": "cuenca", "asset": ASSET_CUENCA}
+        especificacion_area = {
+            "tipo": "cuenca",
+            "fuente": FUENTE_CUENCA,
+            "geometria_vectorial_incluida": True,
+            "geojson": geometria_cuenca(),
+        }
 
     configuracion = {
         "metodologia": METHODOLOGY_VERSION,
         "modo_analisis": modo_analisis,
+        "version_limites_locales": huella_territorial(),
         "area": especificacion_area,
         "periodos": {
             "referencia_metodologica": ANO_REFERENCIA_ANALISIS,
@@ -2005,20 +2021,9 @@ def obtener_ids_fincas():
     )
 
 
-@st.cache_data(ttl=3600, max_entries=4)
+@st.cache_data(max_entries=4)
 def obtener_ids_subcuencas():
-    if not ASSET_SUBCUENCAS:
-        raise PermissionError("La colección de subcuencas no está configurada.")
-    valores = (
-        ee.FeatureCollection(ASSET_SUBCUENCAS)
-        .aggregate_array("SUBCUENC_2")
-        .distinct()
-        .getInfo()
-    )
-    return sorted(
-        [valor for valor in valores if valor is not None],
-        key=clave_orden_natural,
-    )
+    return sorted(nombres_subcuencas(), key=clave_orden_natural)
 
 
 def obtener_geometria_solicitada(
@@ -2037,15 +2042,9 @@ def obtener_geometria_solicitada(
         )
 
     if tipo_area == TIPO_AREA_SUBCUENCA:
-        if not ASSET_SUBCUENCAS:
-            raise PermissionError("La colección de subcuencas no está configurada.")
         if subcuenca_nombre is None:
             raise ValueError("Debe seleccionar una subcuenca antes de ejecutar el análisis.")
-        return (
-            ee.FeatureCollection(ASSET_SUBCUENCAS)
-            .filter(ee.Filter.eq("SUBCUENC_2", subcuenca_nombre))
-            .geometry()
-        )
+        return ee.Geometry(geometria_subcuenca(subcuenca_nombre))
 
     if tipo_area == TIPO_AREA_DIBUJADA:
         if not geometria_geojson:
@@ -2057,7 +2056,7 @@ def obtener_geometria_solicitada(
         )
         return ee.Geometry(datos_geometria)
 
-    return ee.FeatureCollection(ASSET_CUENCA).geometry()
+    return ee.Geometry(geometria_cuenca())
 
 
 def obtener_area(
@@ -2072,11 +2071,11 @@ def obtener_area(
         subcuenca_nombre=subcuenca_nombre,
         geometria_geojson=geometria_geojson,
     )
-    geometria_cuenca = ee.FeatureCollection(ASSET_CUENCA).geometry()
+    geometria_cuenca_local = ee.Geometry(geometria_cuenca())
     geometria_analisis = aplicar_limite_cuenca(
         tipo_area,
         geometria_solicitada,
-        geometria_cuenca,
+        geometria_cuenca_local,
     )
     return ee.FeatureCollection(
         [ee.Feature(geometria_analisis, {"Origen": tipo_area})]
@@ -2613,6 +2612,67 @@ def agregar_mapa_base(mapa, nombre_mapa, control=False):
         control=control,
         **configuracion,
     ).add_to(mapa)
+
+
+def agregar_limite_cuenca_local(mapa, *, control=False, mostrar=True):
+    """Dibuja la cuenca incluida con la app, sin consultar un asset de EE."""
+
+    capa = folium.GeoJson(
+        coleccion_cuenca(),
+        name="Límite de la cuenca",
+        control=control,
+        show=mostrar,
+        style_function=lambda _: {
+            "color": "#062A5E",
+            "weight": 2.4,
+            "opacity": 0.95,
+            "fillColor": "#062A5E",
+            "fillOpacity": 0.025,
+        },
+        highlight_function=lambda _: {
+            "color": "#0A4393",
+            "weight": 3.2,
+            "fillOpacity": 0.05,
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=["nombre"],
+            aliases=["Área:"],
+            sticky=False,
+        ),
+    )
+    capa.add_to(mapa)
+    return capa
+
+
+def agregar_subcuencas_local(mapa, *, control=False, mostrar=False):
+    """Agrega la capa local de subcuencas entregada con el portal HTML."""
+
+    capa = folium.GeoJson(
+        coleccion_subcuencas(),
+        name="Subcuencas del Canal",
+        control=control,
+        show=mostrar,
+        style_function=lambda _: {
+            "color": "#6085B9",
+            "weight": 1.1,
+            "opacity": 0.78,
+            "fillColor": "#0A4393",
+            "fillOpacity": 0.015,
+        },
+        highlight_function=lambda _: {
+            "color": "#77CC09",
+            "weight": 2.2,
+            "fillOpacity": 0.08,
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=["nombre", "grupo", "area_ha"],
+            aliases=["Subcuenca:", "Grupo:", "Superficie (ha):"],
+            localize=True,
+            sticky=False,
+        ),
+    )
+    capa.add_to(mapa)
+    return capa
 
 
 def imagen_bosque_contexto(geometria, distancia_m=RADIO_BUSQUEDA_CORREDOR_M):
@@ -6805,19 +6865,12 @@ if modo_analisis is None:
 contenido_modo = MODOS_ANALISIS[modo_analisis]
 analiza_cambios = modo_analisis in (MODO_TERRITORIAL, MODO_INTEGRAL)
 analiza_conectividad = modo_analisis in (MODO_CORREDORES, MODO_INTEGRAL)
-mostrar_barra_visor(contenido_modo)
-if seccion_tablero == "Análisis":
-    st.caption("Resultados, metodología y descargas del área analizada.")
-else:
-    st.caption(f"{contenido_modo['pregunta']} · {contenido_modo['resultado']}")
 
 try:
     iniciar_earth_engine()
 
-    st.sidebar.markdown("## Panel de trabajo")
-    st.sidebar.caption(contenido_modo["titulo"])
     panel_capas, panel_filtros, panel_mapa_base = st.sidebar.tabs(
-        ["Capas", "Filtros", "Mapa base"]
+        ["Capas", "Polígono", "Mapa base"]
     )
     acciones_sidebar = st.sidebar.container(key="acciones_sidebar")
 
@@ -6879,17 +6932,14 @@ try:
             help="Las fincas están ordenadas de forma natural: 1, 2, 3...",
         )
     elif tipo_area == TIPO_AREA_SUBCUENCA:
-        if not ASSET_SUBCUENCAS:
-            st.error(
-                "La colección de subcuencas no está configurada. El administrador debe "
-                "definir EE_ASSET_SubCuencas en los secretos de Streamlit."
-            )
-            st.stop()
         subcuenca_seleccionada = panel_filtros.selectbox(
             "Subcuenca:",
             obtener_ids_subcuencas(),
             format_func=str,
-            help="Seleccione la subcuenca que desea evaluar.",
+            help=(
+                "Seleccione una de las subcuencas incluidas en la aplicación. "
+                "Esta geometría ya no depende de un asset privado de Earth Engine."
+            ),
         )
     elif tipo_area == TIPO_AREA_DIBUJADA:
         st.subheader("1. Dibuje el área que desea preevaluar")
@@ -6914,23 +6964,16 @@ try:
             control_scale=True,
         )
         agregar_mapa_base(mapa_dibujo, mapa_base, control=False)
-        cuenca_dibujo = ee.FeatureCollection(ASSET_CUENCA)
-        capa_gee(
-            mapa_dibujo,
-            cuenca_dibujo.style(color="FF4444", fillColor="00000000", width=3),
-            {},
-            "Límite de la cuenca",
-            control=False,
-        )
+        agregar_limite_cuenca_local(mapa_dibujo, control=False)
         if geometria_dibujada_json:
             folium.GeoJson(
                 json.loads(geometria_dibujada_json),
                 name="Polígono dibujado",
                 style_function=lambda _: {
-                    "color": "#00E5FF",
-                    "weight": 4,
-                    "fillColor": "#00E5FF",
-                    "fillOpacity": 0.12,
+                    "color": "#D0442C",
+                    "weight": 2.6,
+                    "fillColor": "#D0442C",
+                    "fillOpacity": 0.08,
                 },
             ).add_to(mapa_dibujo)
         Draw(
@@ -6945,12 +6988,12 @@ try:
                 "polygon": {
                     "allowIntersection": False,
                     "showArea": True,
-                    "shapeOptions": {"color": "#00E5FF", "weight": 4},
+                    "shapeOptions": {"color": "#D0442C", "weight": 2.6},
                 },
             },
             edit_options={"edit": True, "remove": True},
         ).add_to(mapa_dibujo)
-        mapa_dibujo.fit_bounds(obtener_limites(cuenca_dibujo))
+        mapa_dibujo.fit_bounds(obtener_limites_geojson(coleccion_cuenca()))
         resultado_dibujo = st_folium(
             mapa_dibujo,
             height=520,
@@ -6995,19 +7038,19 @@ try:
     if superficie_ha <= 0:
         st.error(
             "El área seleccionada no intersecta la cuenca. Seleccione otra unidad o "
-            "dibuje un polígono dentro del límite rojo."
+            "dibuje un polígono dentro del límite de la cuenca."
         )
         st.stop()
     superficie_excluida_ha = max(0.0, superficie_original_ha - superficie_ha)
     if area_debe_recortarse_a_cuenca(tipo_area) and superficie_excluida_ha > 0.01:
-        st.warning(
-            f"El área seleccionada sobrepasa el límite rojo. Se excluyeron "
+        panel_filtros.warning(
+            f"El área seleccionada sobrepasa el límite de la cuenca. Se excluyeron "
             f"{superficie_excluida_ha:,.1f} ha; el análisis usará únicamente las "
             f"{superficie_ha:,.1f} ha ubicadas dentro de la cuenca."
         )
     elif area_debe_recortarse_a_cuenca(tipo_area):
-        st.caption(
-            "El análisis se limita al área ubicada dentro del límite rojo de la cuenca."
+        panel_filtros.caption(
+            "El análisis se limita al área ubicada dentro del límite de la cuenca."
         )
 
     bosque_automatico_disponible = bool(ASSET_BOSQUE_2021)
@@ -7056,6 +7099,18 @@ try:
                     "si desea excluir áreas muy pequeñas del análisis técnico."
                 ),
             )
+
+    with panel_capas.expander("Límites", expanded=True):
+        mostrar_limite_cuenca = st.checkbox(
+            "Cuenca del Canal",
+            value=True,
+            help="Límite local incluido con la aplicación; no consulta un asset de Earth Engine.",
+        )
+        mostrar_subcuencas_local = st.checkbox(
+            "Subcuencas del Canal",
+            value=False,
+            help="Muestra las 53 unidades territoriales incluidas en el portal HTML.",
+        )
 
     panel_capas.markdown("### Capas del mapa")
     opciones_objetivo = PERFILES_POR_MODO[modo_analisis]
@@ -7417,6 +7472,7 @@ try:
         ANO_ESRI_MAX,
         geometria_dibujada_json,
         catalogo_corredores["version_publicada"],
+        huella_territorial(),
         huella_bosque,
         umbral_conectividad_m,
         area_min_parche_ha,
@@ -7445,6 +7501,8 @@ try:
         mostrar_interseccion_corredores_mapa,
         mostrar_corredores_contexto_mapa,
         mostrar_puntos_criticos_mapa,
+        mostrar_limite_cuenca,
+        mostrar_subcuencas_local,
     )
     analisis_actual = (
         st.session_state.get("firma_analisis") == firma_analisis_actual
@@ -7490,13 +7548,23 @@ try:
         columna_panel = st.container(border=True)
         mapa_resultados_contenedor = None
     else:
-        st.markdown(
+        mostrar_panel_resultados = analisis_actual or solicitar_analisis
+        if mostrar_panel_resultados:
+            columna_mapa, columna_resultados = st.columns([3, 1], gap="small")
+            mapa_resultados_contenedor = columna_mapa.container(
+                key="mapa_portal"
+            )
+            columna_panel = columna_resultados.container(
+                key="panel_resultados_visible"
+            )
+        else:
+            mapa_resultados_contenedor = st.container(key="mapa_portal")
+            columna_panel = st.container(key="panel_resultados_oculto")
+        mapa_resultados_contenedor.markdown(
             '<div class="mapa-cabecera"><small>Centro del análisis</small>'
             '<strong>Evidencia cartográfica</strong></div>',
             unsafe_allow_html=True,
         )
-        mapa_resultados_contenedor = st.container(border=True)
-        columna_panel = st.container(border=True)
 
     with columna_panel:
         st.markdown(
@@ -7647,7 +7715,7 @@ try:
                 resultados_nuevos["modo_analisis"] = modo_analisis
                 st.session_state["resultados_analisis"] = resultados_nuevos
                 st.session_state["firma_analisis"] = firma_analisis_actual
-                # El resultado aparece debajo del mapa, que conserva el ancho completo.
+                # El resultado aparece en el panel lateral derecho, como en el portal HTML.
                 # La vista extensa se abre únicamente si el usuario solicita las descargas.
                 st.session_state["mostrar_resultados"] = False
                 if firma_anterior != firma_analisis_actual:
@@ -8243,17 +8311,19 @@ try:
             mostrar_ruta_corredor=mostrar_ruta_corredor,
         )
 
-    cuenca = ee.FeatureCollection(ASSET_CUENCA)
-    capa_limite_cuenca = capa_gee(
+    capa_limite_cuenca = agregar_limite_cuenca_local(
         mapa,
-        cuenca.style(color="FF4444", fillColor="00000000", width=3),
-        {},
-        "Límite de la cuenca",
-        z_index=1000,
+        control=False,
+        mostrar=mostrar_limite_cuenca,
+    )
+    capa_subcuencas = agregar_subcuencas_local(
+        mapa,
+        control=False,
+        mostrar=mostrar_subcuencas_local,
     )
     capa_area_seleccionada = capa_gee(
         mapa,
-        area_seleccionada.style(color="00E5FF", fillColor="00E5FF18", width=4),
+        area_seleccionada.style(color="D0442C", fillColor="D0442C14", width=3),
         {},
         "Área seleccionada",
         z_index=1010,
@@ -8339,7 +8409,7 @@ try:
                 f"{anio_tmf_capa}-{anio_esri_capa}-{anio_ndvi_capa}-"
                 f"{'-'.join(orden_capas_mapa)}-"
                 f"{capa_visible_inicial}-"
-                f"{catalogo_corredores['version_publicada']}-{huella_bosque}-"
+                f"{catalogo_corredores['version_publicada']}-{huella_territorial()}-{huella_bosque}-"
                 f"{umbral_conectividad_m}-{area_min_parche_ha}-"
                 f"{mostrar_fragmentos_bosque}-{mostrar_conexiones_bosque}-"
                 f"{mostrar_bosque_contexto}-"
@@ -8347,6 +8417,7 @@ try:
                 f"{mostrar_interseccion_corredores_mapa}-"
                 f"{mostrar_corredores_contexto_mapa}-"
                 f"{mostrar_puntos_criticos_mapa}-"
+                f"{mostrar_limite_cuenca}-{mostrar_subcuencas_local}-"
                 f"{hash(geometria_dibujada_json or '')}"
             ),
         )
