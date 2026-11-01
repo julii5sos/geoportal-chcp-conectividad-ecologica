@@ -4,6 +4,19 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
+## [5.2.0] - 2026-11-01 — panel de la plataforma HTML
+
+- Adapta la estructura funcional del portal HTML al panel lateral de Streamlit con
+  pestañas reales para **Capas**, **Filtros** y **Mapa base**.
+- Organiza las fuentes JRC, Hansen, ESRI, NDVI, GEDI, ERI y conectividad dentro de
+  Capas; mueve el área, los años y los parámetros técnicos a Filtros.
+- Añade tres fondos intercambiables —imagen satelital, mapa claro y OpenStreetMap— sin
+  alterar las geometrías, métricas ni reglas de la preevaluación.
+- Mantiene las acciones principales fijadas al pie del panel: **Realizar/Actualizar** y,
+  cuando existe un resultado, **Resultados**.
+- Ajusta el panel a 340 px, igual que el modelo HTML, y conserva el modo de enfoque al
+  cerrarlo para que el mapa recupere todo el ancho.
+
 ## [5.1.0] - 2026-10-29 — visor centrado en el mapa
 
 - El mapa pasa a ocupar todo el ancho disponible y 780 px de alto en escritorio; la

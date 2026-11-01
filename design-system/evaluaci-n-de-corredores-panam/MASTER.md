@@ -65,6 +65,9 @@ Los colores originales de Almanaque Azul (`#345a01`, `#a1d303`, `#e0c504`) solo 
 - Panel de fuentes: cada producto ocupa un bloque reconocible —JRC TMF, Hansen, ESRI,
   Sentinel-2/NDVI y GEDI— con sus capas y períodos propios. Corredores y bosque 2021
   permanecen en bloques separados.
+- Panel de trabajo: tres pestañas de igual jerarquía —Capas, Filtros y Mapa base—
+  separan visualización, selección territorial y fondo cartográfico. Las acciones se
+  mantienen visibles al pie del panel sin mezclarse con las capas.
 - Acción Crear análisis: botón primario al final del panel lateral; distingue los
   controles que solo cambian la visualización de la acción que ejecuta los cálculos.
 - Tablero principal: mapa a ancho completo; la unidad, superficie, conclusión y los
@@ -101,6 +104,8 @@ Los colores originales de Almanaque Azul (`#345a01`, `#a1d303`, `#e0c504`) solo 
 - Ninguna métrica, gráfico, tabla o descarga se elimina para reducir la densidad visual; solo cambia el momento en que se presenta.
 - Los controles del mapa permanecen en el panel lateral y los resultados se consultan por
   pestañas, siguiendo el patrón de los visores ambientales profesionales.
+- Capas es la pestaña inicial; Filtros reúne el área, los años y los parámetros técnicos;
+  Mapa base cambia únicamente el contexto visual y nunca la metodología.
 - Al cerrar el panel lateral, el tablero entra en modo de enfoque: mapa y resultados
   ocupan todo el ancho, mientras el control nativo para reabrir el panel permanece visible.
 - Las gráficas de JRC, Hansen, ESRI y NDVI conservan su propia unidad y significado; no

@@ -156,3 +156,17 @@ ESRI, GEDI, NDVI y Almanaque Azul conservan su significado.
   el contenido metodológico continúa disponible en la navegación superior.
 - Cuando el panel lateral se cierra, el mapa aprovecha inmediatamente todo el ancho y el
   control nativo de Streamlit permite volver a abrirlo.
+
+## Panel de la plataforma HTML 5.2
+
+- El panel lateral adopta los 340 px del HTML de referencia y se divide en tres pestañas
+  funcionales: **Capas**, **Filtros** y **Mapa base**.
+- Capas reúne las fuentes cartográficas y sus interruptores; Filtros contiene la unidad
+  territorial, los períodos del comparador y las opciones técnicas; Mapa base permite
+  elegir imagen satelital, mapa claro u OpenStreetMap.
+- Las acciones se fijan al borde inferior del panel. Antes de calcular se muestra una
+  sola acción primaria; después se añaden Actualizar y Resultados en una fila compacta.
+- El fondo cartográfico forma parte de la firma visual y fuerza la actualización del mapa,
+  pero no invalida ni vuelve a ejecutar el resultado analítico.
+- En pantallas estrechas las pestañas conservan un área de interacción de 48 px y el panel
+  vuelve al ancho adaptable definido para móviles.

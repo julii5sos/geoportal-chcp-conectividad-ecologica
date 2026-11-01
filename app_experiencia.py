@@ -186,9 +186,9 @@ st.markdown(
     }
     [data-testid="stSidebar"][data-collapsed="false"] {
         border-right: 1px solid var(--institucional-borde);
-        width: 315px !important;
-        min-width: 315px;
-        max-width: 315px;
+        width: 340px !important;
+        min-width: 340px;
+        max-width: 340px;
         box-shadow: 6px 0 20px rgba(6,42,94,.05);
     }
     [data-testid="stSidebar"][data-collapsed="true"] {
@@ -214,6 +214,48 @@ st.markdown(
     }
     [data-testid="stSidebar"] [data-testid="stExpander"] summary {
         color:var(--institucional-verde)!important;font-weight:700;
+    }
+    [data-testid="stSidebar"] [data-testid="stTabs"] [data-baseweb="tab-list"] {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0;
+        background: #ffffff;
+        border-bottom: 1px solid var(--institucional-borde);
+    }
+    [data-testid="stSidebar"] [data-testid="stTabs"] button[role="tab"] {
+        min-width: 0;
+        min-height: 48px;
+        padding: .45rem .25rem;
+        color: var(--institucional-suave) !important;
+        font-size: .68rem;
+        font-weight: 750;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+    }
+    [data-testid="stSidebar"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+        color: var(--institucional-verde) !important;
+        box-shadow: inset 0 -4px 0 var(--institucional-verde-acento);
+    }
+    [data-testid="stSidebar"] [data-testid="stTabs"] [data-baseweb="tab-panel"] {
+        padding: .65rem 0 5.5rem;
+    }
+    [data-testid="stSidebar"] .st-key-acciones_sidebar {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        z-index: 30;
+        width: 340px;
+        margin: 0;
+        padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom, 0px));
+        border-top: 1px solid var(--institucional-borde);
+        background: rgba(255,255,255,.98);
+        box-shadow: 0 -8px 18px rgba(6,42,94,.08);
+    }
+    [data-testid="stSidebar"][data-collapsed="true"] .st-key-acciones_sidebar {
+        display: none;
     }
     #MainMenu, footer {visibility: hidden;}
     iframe {max-width: 100% !important;}
@@ -1010,6 +1052,10 @@ st.markdown(
             min-width: auto;
             max-width: none;
         }
+        [data-testid="stSidebar"] .st-key-acciones_sidebar {
+            width: 100%;
+            max-width: 100vw;
+        }
         .cabecera-app {padding: 1.2rem;}
         .cabecera-app h1 {font-size: 2rem; line-height: 1.15;}
         .visor-barra {align-items: flex-start; flex-direction: column;}
@@ -1051,7 +1097,29 @@ def secreto_opcional(nombre, predeterminado=None):
         return predeterminado
 
 
-APP_VERSION = "UX-5.1-MAPA-PRIMERO"
+APP_VERSION = "UX-5.2-PLATAFORMA-HTML"
+
+MAPAS_BASE = {
+    "Imagen satelital": {
+        "tiles": (
+            "https://server.arcgisonline.com/ArcGIS/rest/services/"
+            "World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        ),
+        "attr": "Esri",
+        "max_zoom": 20,
+    },
+    "Mapa claro": {
+        "tiles": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        "attr": "OpenStreetMap contributors · CARTO",
+        "max_zoom": 20,
+        "subdomains": "abcd",
+    },
+    "OpenStreetMap": {
+        "tiles": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "attr": "OpenStreetMap contributors",
+        "max_zoom": 19,
+    },
+}
 
 COLORES_FUENTES = {
     "JRC TMF": "#1F8A70",
@@ -1845,10 +1913,12 @@ def procesar_codigo_acceso_fincas():
     st.session_state["codigo_acceso_fincas"] = ""
 
 
-def solicitar_acceso_fincas():
+def solicitar_acceso_fincas(contenedor=None):
+    if contenedor is None:
+        contenedor = st.sidebar
     codigo_configurado = str(secreto_opcional("FINCAS_ACCESS_CODE", ""))
     if not ASSET_FINCAS or len(codigo_configurado) < 8:
-        st.sidebar.error(
+        contenedor.error(
             "El acceso privado a las fincas no está configurado. El administrador debe "
             "definir EE_ASSET_FINCAS y FINCAS_ACCESS_CODE en los secretos de Streamlit."
         )
@@ -1856,42 +1926,42 @@ def solicitar_acceso_fincas():
 
     mensaje = st.session_state.pop("mensaje_acceso_fincas", None)
     if acceso_fincas_vigente():
-        st.sidebar.success("Acceso privado a fincas activo")
-        st.sidebar.caption("La autorización caduca automáticamente después de 30 minutos.")
-        st.sidebar.button(
+        contenedor.success("Acceso privado a fincas activo")
+        contenedor.caption("La autorización caduca automáticamente después de 30 minutos.")
+        contenedor.button(
             "Cerrar acceso a fincas",
             on_click=cerrar_acceso_fincas,
             use_container_width=True,
         )
         if mensaje and mensaje[0] == "success":
-            st.sidebar.success(mensaje[1])
+            contenedor.success(mensaje[1])
         return True
 
     bloqueo_hasta = float(st.session_state.get("fincas_bloqueo_hasta", 0))
     if time.time() < bloqueo_hasta:
-        st.sidebar.warning(
+        contenedor.warning(
             "Acceso temporalmente bloqueado. Espere un minuto antes de volver a intentarlo."
         )
         return False
 
-    st.sidebar.info(
+    contenedor.info(
         "Esta opción contiene información privada. Ingrese el código autorizado para "
         "consultar la lista de fincas."
     )
-    st.sidebar.text_input(
+    contenedor.text_input(
         "Código de acceso",
         type="password",
         key="codigo_acceso_fincas",
         help="El código no se guarda en GitHub ni se incluye en los informes.",
     )
-    st.sidebar.button(
+    contenedor.button(
         "Acceder a las fincas",
         type="primary",
         on_click=procesar_codigo_acceso_fincas,
         use_container_width=True,
     )
     if mensaje:
-        getattr(st.sidebar, mensaje[0])(mensaje[1])
+        getattr(contenedor, mensaje[0])(mensaje[1])
     return False
 
 
@@ -2531,6 +2601,18 @@ def capa_gee(
     )
     capa.add_to(mapa)
     return capa
+
+
+def agregar_mapa_base(mapa, nombre_mapa, control=False):
+    """Agrega al visor el fondo elegido en la pestaña Mapa base."""
+
+    configuracion = dict(MAPAS_BASE.get(nombre_mapa, MAPAS_BASE["Imagen satelital"]))
+    folium.TileLayer(
+        name=nombre_mapa,
+        overlay=False,
+        control=control,
+        **configuracion,
+    ).add_to(mapa)
 
 
 def imagen_bosque_contexto(geometria, distancia_m=RADIO_BUSQUEDA_CORREDOR_M):
@@ -6732,9 +6814,25 @@ else:
 try:
     iniciar_earth_engine()
 
-    st.sidebar.markdown("## Área de análisis")
+    st.sidebar.markdown("## Panel de trabajo")
     st.sidebar.caption(contenido_modo["titulo"])
-    if st.sidebar.button(
+    panel_capas, panel_filtros, panel_mapa_base = st.sidebar.tabs(
+        ["Capas", "Filtros", "Mapa base"]
+    )
+    acciones_sidebar = st.sidebar.container(key="acciones_sidebar")
+
+    mapa_base = panel_mapa_base.selectbox(
+        "Fondo cartográfico",
+        list(MAPAS_BASE),
+        help="Cambia únicamente el fondo de referencia; no modifica los cálculos.",
+    )
+    panel_mapa_base.caption(
+        "Use imagen satelital para inspección visual y mapa claro cuando necesite "
+        "distinguir mejor las capas temáticas."
+    )
+
+    panel_filtros.markdown("### Área de análisis")
+    if panel_filtros.button(
         "Cambiar enfoque",
         use_container_width=True,
         key="cambiar_enfoque_sidebar",
@@ -6756,25 +6854,25 @@ try:
         "Dibujar polígono en el mapa": "La parte exterior de la CHCP se excluye.",
         "Toda la cuenca": "Análisis regional; puede requerir más tiempo.",
     }
-    tipo_area = st.sidebar.selectbox(
+    tipo_area = panel_filtros.selectbox(
         "Unidad territorial",
         ["Finca de monitoreo", "Subcuenca", "Dibujar polígono en el mapa", "Toda la cuenca"],
         format_func=lambda valor: etiquetas_area[valor],
         help="Se recomienda iniciar con una finca. El análisis de toda la cuenca puede tardar varios minutos.",
     )
-    st.sidebar.caption(descripciones_area[tipo_area])
+    panel_filtros.caption(descripciones_area[tipo_area])
     finca_seleccionada = None
     subcuenca_seleccionada = None
     geometria_dibujada_json = st.session_state.get("geometria_dibujada_json")
     version_mapa_dibujo = st.session_state.get("version_mapa_dibujo", 0)
     if tipo_area == "Finca de monitoreo":
-        if not solicitar_acceso_fincas():
+        if not solicitar_acceso_fincas(panel_filtros):
             st.info(
                 "El acceso a las fincas está protegido. Ingrese el código en el panel lateral "
                 "o seleccione otra unidad territorial."
             )
             st.stop()
-        finca_seleccionada = st.sidebar.selectbox(
+        finca_seleccionada = panel_filtros.selectbox(
             "Finca:",
             obtener_ids_fincas(),
             format_func=str,
@@ -6787,7 +6885,7 @@ try:
                 "definir EE_ASSET_SubCuencas en los secretos de Streamlit."
             )
             st.stop()
-        subcuenca_seleccionada = st.sidebar.selectbox(
+        subcuenca_seleccionada = panel_filtros.selectbox(
             "Subcuenca:",
             obtener_ids_subcuencas(),
             format_func=str,
@@ -6815,17 +6913,7 @@ try:
             tiles=None,
             control_scale=True,
         )
-        folium.TileLayer(
-            tiles=(
-                "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                "World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            ),
-            attr="Esri",
-            name="Imagen satelital",
-            overlay=False,
-            control=False,
-            max_zoom=20,
-        ).add_to(mapa_dibujo)
+        agregar_mapa_base(mapa_dibujo, mapa_base, control=False)
         cuenca_dibujo = ee.FeatureCollection(ASSET_CUENCA)
         capa_gee(
             mapa_dibujo,
@@ -6937,15 +7025,14 @@ try:
     )
     catalogo_corredores = cargar_catalogo_corredores()
 
-    st.sidebar.markdown("---")
     if analiza_conectividad:
         if not bosque_automatico_disponible:
-            st.sidebar.warning(
+            panel_filtros.warning(
                 "La red de fragmentos no está disponible. Aun puede consultar los "
                 "corredores publicados."
             )
 
-        with st.sidebar.expander("Opciones técnicas · opcional", expanded=False):
+        with panel_filtros.expander("Opciones técnicas · opcional", expanded=False):
             st.caption(
                 "Conserve los valores recomendados salvo que necesite una lectura técnica."
             )
@@ -6970,17 +7057,16 @@ try:
                 ),
             )
 
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### Capas del mapa")
+    panel_capas.markdown("### Capas del mapa")
     opciones_objetivo = PERFILES_POR_MODO[modo_analisis]
     if len(opciones_objetivo) == 1:
         objetivo = opciones_objetivo[0]
         if modo_analisis == MODO_INTEGRAL:
-            st.sidebar.caption("Vista combinada preparada automáticamente.")
+            panel_capas.caption("Vista combinada preparada automáticamente.")
         else:
-            st.sidebar.markdown(f"**{objetivo}**")
+            panel_capas.markdown(f"**{objetivo}**")
     else:
-        objetivo = st.sidebar.selectbox(
+        objetivo = panel_capas.selectbox(
             "¿Qué desea ver en el mapa?",
             opciones_objetivo,
             help=(
@@ -6989,7 +7075,7 @@ try:
             ),
         )
     perfil = PERFILES_VISUALIZACION[objetivo]
-    st.sidebar.caption(perfil["descripcion"])
+    panel_capas.caption(perfil["descripcion"])
 
     opciones_capas = [
         "Sectores para revisión",
@@ -7052,64 +7138,64 @@ try:
         capa_visible_inicial = None
         if modo_comparador == "JRC TMF":
             opciones_inicio_tmf = list(range(1990, ANO_TMF_MAX))
-            anio_tmf_inicial = st.sidebar.selectbox(
+            anio_tmf_inicial = panel_filtros.selectbox(
                 "Año inicial (JRC):",
                 opciones_inicio_tmf,
                 index=opciones_inicio_tmf.index(2020),
             )
             opciones_final_tmf = list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))
-            anio_tmf_final = st.sidebar.selectbox(
+            anio_tmf_final = panel_filtros.selectbox(
                 "Año final (JRC):",
                 opciones_final_tmf,
                 index=len(opciones_final_tmf) - 1,
             )
-            st.sidebar.caption(
+            panel_filtros.caption(
                 f"Comparación visual. El análisis no resta estos años: clasifica el "
                 f"estado JRC de {ANO_DIAG_TMF}."
             )
         elif modo_comparador == "ESRI LULC":
             opciones_inicio_esri = list(range(ANO_ESRI_MIN, ANO_ESRI_MAX))
-            anio_esri_inicial = st.sidebar.selectbox(
+            anio_esri_inicial = panel_filtros.selectbox(
                 "Año inicial (ESRI):",
                 opciones_inicio_esri,
             )
             opciones_final_esri = list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))
-            anio_esri_final = st.sidebar.selectbox(
+            anio_esri_final = panel_filtros.selectbox(
                 "Año final (ESRI):",
                 opciones_final_esri,
                 index=len(opciones_final_esri) - 1,
             )
-            st.sidebar.caption(
+            panel_filtros.caption(
                 f"El análisis usa los extremos disponibles {ANO_ESRI_MIN} y "
                 f"{ANO_ESRI_MAX}; esta selección solo cambia el comparador."
             )
         else:
             opciones_inicio_ndvi = list(range(2017, ANO_NDVI_MAX))
-            anio_ndvi_inicial = st.sidebar.selectbox(
+            anio_ndvi_inicial = panel_filtros.selectbox(
                 "Año inicial (NDVI):",
                 opciones_inicio_ndvi,
                 index=opciones_inicio_ndvi.index(2022),
             )
             opciones_final_ndvi = list(range(anio_ndvi_inicial + 1, ANO_NDVI_MAX + 1))
-            anio_ndvi_final = st.sidebar.selectbox(
+            anio_ndvi_final = panel_filtros.selectbox(
                 "Año final (NDVI):",
                 opciones_final_ndvi,
                 index=len(opciones_final_ndvi) - 1,
             )
-            st.sidebar.caption(
+            panel_filtros.caption(
                 "Comparación visual de vigor vegetal. El período elegido aquí no cambia "
                 f"la señal ponderada, que utiliza {ANO_NDVI_INICIAL_ANALISIS}-{ANO_NDVI_FINAL_ANALISIS}."
             )
     else:
         modo_comparador = "Sin comparador"
         capas_activas = []
-        st.sidebar.markdown("### Capas e indicadores")
-        st.sidebar.caption(
+        panel_capas.markdown("### Capas e indicadores")
+        panel_capas.caption(
             "Active una o varias fuentes. Cada bloque explica qué información aporta."
         )
 
         if analiza_cambios:
-            if st.sidebar.checkbox(
+            if panel_capas.checkbox(
                 "Resultado combinado · sectores para revisión",
                 value="Sectores para revisión" in perfil["capas"],
                 key=f"capa_resultado_{modo_analisis}",
@@ -7117,7 +7203,7 @@ try:
             ):
                 capas_activas.append("Sectores para revisión")
 
-            with st.sidebar.expander("JRC Tropical Moist Forest", expanded=True):
+            with panel_capas.expander("JRC Tropical Moist Forest", expanded=True):
                 st.caption("Estado anual del bosque tropical desde 1990.")
                 if st.checkbox(
                     "Estado forestal",
@@ -7154,7 +7240,7 @@ try:
                     key=f"anio_jrc_{modo_analisis}",
                 )
 
-            with st.sidebar.expander("Hansen Global Forest Change", expanded=False):
+            with panel_capas.expander("Hansen Global Forest Change", expanded=False):
                 st.caption("Pérdida anual de cobertura arbórea desde 2001.")
                 if st.checkbox(
                     "Pérdida posterior a 2020",
@@ -7175,7 +7261,7 @@ try:
                 ):
                     capas_activas.append("Cobertura arbórea persistente")
 
-            with st.sidebar.expander("ESRI Land Use / Land Cover", expanded=False):
+            with panel_capas.expander("ESRI Land Use / Land Cover", expanded=False):
                 st.caption("Cobertura del suelo y cambios de la clase árboles.")
                 if st.checkbox(
                     "Uso y cobertura del suelo",
@@ -7196,7 +7282,7 @@ try:
                     key=f"anio_esri_{modo_analisis}",
                 )
 
-            with st.sidebar.expander("Sentinel-2 · NDVI", expanded=False):
+            with panel_capas.expander("Sentinel-2 · NDVI", expanded=False):
                 st.caption("Vigor de la vegetación y disminución entre períodos.")
                 if st.checkbox(
                     "Cambio del vigor vegetal",
@@ -7223,7 +7309,7 @@ try:
                     key=f"anio_ndvi_cambio_{modo_analisis}",
                 )
 
-            with st.sidebar.expander("GEDI · altura del dosel", expanded=False):
+            with panel_capas.expander("GEDI · altura del dosel", expanded=False):
                 st.caption("Estructura vertical disponible; no es una serie anual continua.")
                 if st.checkbox(
                     "Altura del dosel",
@@ -7232,7 +7318,7 @@ try:
                 ):
                     capas_activas.append("Altura GEDI")
 
-        with st.sidebar.expander("ERI · resiliencia ecológica", expanded=False):
+        with panel_capas.expander("ERI · resiliencia ecológica", expanded=False):
             st.caption(
                 "Síntesis complementaria de estructura, conectividad local, estabilidad "
                 "topográfica y proximidad riparia."
@@ -7249,7 +7335,7 @@ try:
                 capas_activas.append("ERI indicativo")
 
         if analiza_conectividad:
-            with st.sidebar.expander("Almanaque Azul · corredores", expanded=True):
+            with panel_capas.expander("Almanaque Azul · corredores", expanded=True):
                 mostrar_interseccion_corredores_mapa = st.checkbox(
                     "Coincidencia dentro del área analizada",
                     value=True,
@@ -7273,7 +7359,7 @@ try:
                     value=False,
                     key=f"capa_puntos_{modo_analisis}",
                 )
-            with st.sidebar.expander(
+            with panel_capas.expander(
                 f"{FUENTE_BOSQUE_ORGANIZACION} · bosque {ANO_BOSQUE_REFERENCIA}",
                 expanded=modo_analisis == MODO_CORREDORES,
             ):
@@ -7308,7 +7394,7 @@ try:
 
         orden_capas_mapa = list(capas_activas)
         if not capas_activas and not analiza_conectividad:
-            st.sidebar.warning("Active al menos una capa territorial para mostrarla en el mapa.")
+            panel_capas.warning("Active al menos una capa territorial para mostrarla en el mapa.")
 
     capa_contextual = resolver_capa_contextual(
         modo_analisis,
@@ -7337,6 +7423,7 @@ try:
     )
     firma_visual_actual = (
         firma_analisis_actual,
+        mapa_base,
         modo_mapa,
         modo_comparador,
         anio_tmf_inicial,
@@ -7363,8 +7450,7 @@ try:
         st.session_state.get("firma_analisis") == firma_analisis_actual
     )
     if seccion_tablero == "Análisis":
-        st.sidebar.markdown("## Acciones")
-        st.sidebar.button(
+        acciones_sidebar.button(
             "Volver al mapa",
             type="primary",
             use_container_width=True,
@@ -7373,17 +7459,20 @@ try:
         )
         solicitar_analisis = False
     else:
-        st.sidebar.markdown("## Acciones")
-        solicitar_analisis = st.sidebar.button(
-            "Actualizar análisis" if analisis_actual else "Crear análisis",
+        columna_analizar = acciones_sidebar
+        columna_resultados = None
+        if analisis_actual:
+            columna_analizar, columna_resultados = acciones_sidebar.columns([1.1, 1])
+        solicitar_analisis = columna_analizar.button(
+            "Actualizar" if analisis_actual else "Realizar análisis",
             type="primary",
             use_container_width=True,
             key="crear_analisis_panel",
             help=f"Procesa únicamente la información de {contenido_modo['titulo'].lower()}.",
         )
-        if analisis_actual:
-            st.sidebar.button(
-                "Resultados y descargas",
+        if columna_resultados is not None:
+            columna_resultados.button(
+                "Resultados",
                 use_container_width=True,
                 key="abrir_resultados_sidebar",
                 on_click=abrir_resultados_contextuales,
@@ -7858,17 +7947,7 @@ try:
         prefer_canvas=True,
         **opciones_interaccion_mapa(modo_comparador != "Sin comparador"),
     )
-    folium.TileLayer(
-        tiles=(
-            "https://server.arcgisonline.com/ArcGIS/rest/services/"
-            "World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        ),
-        attr="Esri",
-        name="Imagen satelital",
-        overlay=False,
-        control=True,
-        max_zoom=20,
-    ).add_to(mapa)
+    agregar_mapa_base(mapa, mapa_base, control=True)
     Fullscreen(position="topleft", title="Pantalla completa").add_to(mapa)
 
     capa_izquierda = None
@@ -8254,7 +8333,7 @@ try:
             use_container_width=True,
             returned_objects=[],
             key=(
-                f"mapa-{APP_VERSION}-{modo_analisis}-{tipo_area}-{finca_seleccionada}-{subcuenca_seleccionada}-{modo_mapa}-{modo_comparador}-"
+                f"mapa-{APP_VERSION}-{mapa_base}-{modo_analisis}-{tipo_area}-{finca_seleccionada}-{subcuenca_seleccionada}-{modo_mapa}-{modo_comparador}-"
                 f"{anio_tmf_inicial}-{anio_tmf_final}-{anio_esri_inicial}-"
                 f"{anio_esri_final}-{anio_ndvi_inicial}-{anio_ndvi_final}-"
                 f"{anio_tmf_capa}-{anio_esri_capa}-{anio_ndvi_capa}-"
