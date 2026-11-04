@@ -88,6 +88,27 @@ button,[role="button"]{min-height:44px;}
 .ref-mode-card .result{padding-top:10px;border-top:1px solid var(--azul-linea);}
 .ref-mode-card .more{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;color:var(--azul)!important;font-size:14px;font-weight:700;}
 .ref-mode-card .more .ref-chev{flex:none;}
+.ref-selector-entry{display:flex;max-width:1180px;align-items:center;justify-content:space-between;gap:24px;margin:0 auto;padding:26px;border-radius:var(--r);background:var(--azul-suave);}
+.ref-selector-entry .eyebrow{display:block;margin-bottom:5px;color:var(--azul)!important;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+.ref-selector-entry h2{margin:0;color:var(--azul)!important;font-size:22px;}
+.ref-selector-entry p{max-width:70ch;margin:7px 0 0;color:var(--muted)!important;line-height:1.55;}
+.ref-selector-entry .ref-btn{flex:none;background:var(--azul);color:#fff!important;}
+
+/* Selector modal: reproduce el asistente del HTML de referencia. */
+div[role="dialog"]{border-radius:10px!important;overflow:hidden!important;}
+div[role="dialog"] [data-testid="stDialogHeader"]{padding:16px 22px!important;background:var(--azul)!important;}
+div[role="dialog"] [data-testid="stDialogHeader"] h2,div[role="dialog"] [data-testid="stDialogHeader"] button{color:#fff!important;}
+div[role="dialog"] button{min-height:44px!important;}
+div[role="dialog"] button[aria-label="Close"]{display:grid!important;width:44px!important;min-width:44px!important;height:44px!important;padding:0!important;place-items:center!important;}
+.selector-pasos{list-style:none;margin:0;padding:8px 6px;display:flex;flex-direction:column;gap:6px;}
+.selector-pasos li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:999px;color:var(--muted);font-size:13px;font-weight:700;}
+.selector-pasos li i{display:grid;place-items:center;flex:none;width:25px;height:25px;border:1.5px solid var(--azul-linea);border-radius:50%;background:#fff;color:var(--muted);font-style:normal;font-size:11px;}
+.selector-pasos li.actual{background:#fff;color:var(--azul);}
+.selector-pasos li.actual i{border-color:var(--azul);background:var(--azul);color:#fff;}
+.st-key-selector_portal_dialogo [role="radiogroup"]{gap:8px!important;}
+.st-key-selector_portal_dialogo [role="radiogroup"]>label{align-items:flex-start!important;min-height:72px;padding:12px 14px!important;border:1.5px solid var(--azul-linea)!important;border-radius:var(--r)!important;background:#fff!important;cursor:pointer;}
+.st-key-selector_portal_dialogo [role="radiogroup"]>label:has(input:checked){border-color:var(--azul)!important;background:var(--azul-suave)!important;box-shadow:inset 4px 0 0 var(--verde);}
+.st-key-selector_portal_dialogo [role="radiogroup"]>label p{color:var(--muted)!important;line-height:1.45!important;}
 
 /* Componentes Streamlit con la misma gramática del HTML. */
 .stButton>button,.stDownloadButton>button{border:1.5px solid var(--azul)!important;border-radius:999px!important;background:#fff!important;color:var(--azul)!important;font-size:13.5px!important;font-weight:700!important;box-shadow:none!important;}
@@ -141,7 +162,7 @@ iframe[title="streamlit_folium.st_folium"]{display:block;border:0!important;bord
   [data-testid="stSidebar"][data-collapsed="false"]{width:min(340px,100vw)!important;min-width:min(340px,100vw)!important;max-width:min(340px,100vw)!important}
   [data-testid="stSidebar"] .st-key-acciones_sidebar{width:min(340px,100vw)}
   .ref-hero{margin:-8px -10px 0;min-height:420px}.ref-meta{grid-template-columns:1fr 1fr}.ref-meta>div+div{border-left:0;border-top:1px solid var(--azul-linea)}
-  .ref-modes{margin:0 -10px;padding:24px 16px 32px}.ref-mode-cards{grid-template-columns:1fr}.ref-mode-card{min-height:0}
+  .ref-modes{margin:0 -10px;padding:24px 16px 32px}.ref-mode-cards{grid-template-columns:1fr}.ref-mode-card{min-height:0}.ref-selector-entry{align-items:stretch;flex-direction:column}.ref-selector-entry .ref-btn{width:100%}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important;}}
 </style>
@@ -177,22 +198,22 @@ def mostrar_navegacion_portal(seccion: str) -> None:
 
     st.markdown(
         f"""
-        <a class="ref-skip" href="#stMain">Saltar al contenido principal</a>
+        <a class="ref-skip" href="#stMain" target="_self">Saltar al contenido principal</a>
         <header class="ref-nav">
           <div class="ref-nav-in">
-            <div class="ref-util"><a href="?seccion=inicio">Inicio</a><a href="?seccion=datos">Atribución de datos</a><span>WGS 84 · EPSG:4326</span></div>
+            <div class="ref-util"><a href="?seccion=inicio" target="_self">Inicio</a><a href="?seccion=datos" target="_self">Atribución de datos</a><span>WGS 84 · EPSG:4326</span></div>
             <div class="ref-main-row">
-              <a class="ref-wm" href="?seccion=inicio" aria-label="Inicio · Conectividad Panamá">{LOGO_PORTAL}<span><b>Conectividad Panamá</b><small>Cuenca del Canal de Panamá</small></span></a>
+              <a class="ref-wm" href="?seccion=inicio" target="_self" aria-label="Inicio · Conectividad Panamá">{LOGO_PORTAL}<span><b>Conectividad Panamá</b><small>Cuenca del Canal de Panamá</small></span></a>
               <nav class="ref-links" aria-label="Secciones">
-                <a href="?seccion=objetivo"{actual('objetivo')}>Conoce la herramienta<i class="ref-chev"></i></a>
-                <a href="{destino_plataforma}"{actual('mapa')}>Plataforma<i class="ref-chev"></i></a>
-                <a href="?seccion=datos"{actual('datos')}>Uso de datos<i class="ref-chev"></i></a>
-                <a href="?seccion=acerca"{actual('acerca')}>FAQ<i class="ref-chev"></i></a>
+                <a href="?seccion=objetivo" target="_self"{actual('objetivo')}>Conoce la herramienta<i class="ref-chev"></i></a>
+                <a href="{destino_plataforma}" target="_self"{actual('mapa')}>Plataforma<i class="ref-chev"></i></a>
+                <a href="?seccion=datos" target="_self"{actual('datos')}>Uso de datos<i class="ref-chev"></i></a>
+                <a href="?seccion=acerca" target="_self"{actual('acerca')}>FAQ<i class="ref-chev"></i></a>
               </nav>
               <div class="ref-nav-btns">
-                <a class="ref-btn ref-btn-w" href="{destino_plataforma}">Explorar datos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+                <a class="ref-btn ref-btn-w" href="{destino_plataforma}" target="_self">Explorar datos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
                 <details class="ref-lang"><summary class="ref-btn ref-btn-o" aria-label="Idioma: español">ES <i class="ref-chev"></i></summary><div class="ref-lang-menu"><button type="button" aria-checked="true">Español <span>✓</span></button><button type="button" disabled>English <span>pronto</span></button></div></details>
-                <details class="ref-mobile-menu"><summary class="ref-burger">Menú</summary><nav class="ref-mobile-links" aria-label="Secciones móviles"><a href="?seccion=objetivo">Conoce la herramienta</a><a href="{destino_plataforma}">Plataforma</a><a href="?seccion=datos">Uso de datos</a><a href="?seccion=acerca">FAQ</a></nav></details>
+                <details class="ref-mobile-menu"><summary class="ref-burger">Menú</summary><nav class="ref-mobile-links" aria-label="Secciones móviles"><a href="?seccion=objetivo" target="_self">Conoce la herramienta</a><a href="{destino_plataforma}" target="_self">Plataforma</a><a href="?seccion=datos" target="_self">Uso de datos</a><a href="?seccion=acerca" target="_self">FAQ</a></nav></details>
               </div>
             </div>
           </div>
@@ -209,7 +230,7 @@ def mostrar_hero_inicio() -> None:
           <div class="ref-hero-in">
             <h1>Conectividad ecológica de la Cuenca del Canal de Panamá</h1>
             <p>Portal SIG para detectar dónde hay conectividad, dónde hay fragmentación, dónde se está perdiendo bosque y dónde conviene revisar. Integra JRC, Hansen, ESRI, GEDI y Sentinel en Google Earth Engine, los corredores de Almanaque Azul, el bosque 2021 de MiAMBIENTE y el Índice de Resiliencia Ecológica (ERI).</p>
-            <div class="ref-acts"><a class="ref-btn ref-btn-w" href="#seleccionar-analisis">Elegir análisis</a><a class="ref-btn ref-btn-o" href="?seccion=metodo">Conocer el método</a></div>
+            <div class="ref-acts"><a class="ref-btn ref-btn-w" href="?seccion=inicio&amp;selector=1" target="_self">Realizar análisis</a><a class="ref-btn ref-btn-o" href="?seccion=metodo" target="_self">Conocer el método</a></div>
           </div>
           <svg class="ref-hero-cut" viewBox="0 0 1440 150" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,150 1440,40 1440,150" fill="#fff"/><g fill="none" stroke="#fabc20" stroke-opacity=".7" stroke-width="1.3"><path d="M1150 150 C1210 112 1320 96 1440 92"/><path d="M1200 150 C1255 120 1340 108 1440 106"/><path d="M1250 150 C1300 128 1365 120 1440 119"/></g><polygon points="960,62.7 1440,26 1440,34 960,70.7" fill="#fff"/><polygon points="880,78.8 1440,36 1440,46 880,88.8" fill="#77cc09"/><polygon points="990,84.4 1440,50 1440,59 990,93.4" fill="#fabc20"/></svg>
         </section>
@@ -232,7 +253,7 @@ def mostrar_tarjetas_modos(modos: dict[str, dict[str, str]]) -> None:
         descripcion = escapar(contenido["descripcion"])
         resultado = escapar(contenido["resultado"])
         tarjetas.append(
-            f'<a class="ref-mode-card" href="?seccion=mapa&amp;modo={escapar(modo)}">'
+            f'<a class="ref-mode-card" href="?seccion=mapa&amp;modo={escapar(modo)}" target="_self">'
             f'<span class="date">{pregunta}</span>'
             f"<h3>{titulo}</h3>"
             f"<p>{descripcion}</p>"
@@ -245,6 +266,26 @@ def mostrar_tarjetas_modos(modos: dict[str, dict[str, str]]) -> None:
         '<section class="ref-modes" id="seleccionar-analisis"><div class="ref-mode-cards">'
         + "".join(tarjetas)
         + "</div></section>",
+        unsafe_allow_html=True,
+    )
+
+
+def mostrar_acceso_selector() -> None:
+    """Muestra la única entrada al asistente, como el botón del HTML original."""
+
+    st.markdown(
+        """
+        <section class="ref-modes" id="seleccionar-analisis">
+          <div class="ref-selector-entry">
+            <div>
+              <span class="eyebrow">Asistente de análisis</span>
+              <h2>Seleccione qué desea conocer</h2>
+              <p>El asistente presenta las tres preevaluaciones, explica qué entrega cada una y después abre el mapa con los controles correspondientes.</p>
+            </div>
+            <a class="ref-btn" href="?seccion=inicio&amp;selector=1" target="_self">Realizar análisis</a>
+          </div>
+        </section>
+        """,
         unsafe_allow_html=True,
     )
 

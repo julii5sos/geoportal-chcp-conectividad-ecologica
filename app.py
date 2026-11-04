@@ -15,9 +15,9 @@ from metodologia_indice import (
 from modos_app import MODO_INTEGRAL, MODOS_ANALISIS
 from portal_html import (
     inyectar_estilo_portal,
+    mostrar_acceso_selector,
     mostrar_hero_inicio,
     mostrar_navegacion_portal,
-    mostrar_tarjetas_modos,
 )
 
 
@@ -161,6 +161,7 @@ def elegir_modo(modo):
     st.session_state["selector_modo_sidebar"] = modo
     st.session_state["seccion_tablero"] = SECCION_MAPA
     st.session_state["mostrar_resultados"] = False
+    st.query_params.clear()
     st.query_params["seccion"] = "mapa"
     st.query_params["modo"] = modo
 
@@ -174,6 +175,63 @@ def abrir_selector_analisis():
     st.session_state["seccion_tablero"] = SECCION_MAPA
     st.query_params.clear()
     st.query_params["seccion"] = "inicio"
+
+
+def cerrar_selector_analisis():
+    st.query_params.clear()
+    st.query_params["seccion"] = "inicio"
+
+
+@st.dialog("Realizar análisis", width="large")
+def mostrar_selector_dialogo():
+    """Replica el primer paso del asistente incluido en el HTML de referencia."""
+
+    modos = list(MODOS_ANALISIS)
+    if st.session_state.get("selector_modo_inicio") not in MODOS_ANALISIS:
+        st.session_state["selector_modo_inicio"] = MODO_INTEGRAL
+
+    columna_pasos, columna_pregunta = st.columns([0.28, 0.72], gap="medium")
+    with columna_pasos:
+        st.markdown(
+            """
+            <ol class="selector-pasos" aria-label="Pasos del asistente">
+              <li class="actual"><i>1</i><span>Pregunta</span></li>
+              <li><i>2</i><span>Área</span></li>
+              <li><i>3</i><span>Parámetros</span></li>
+              <li><i>4</i><span>Revisión</span></li>
+            </ol>
+            """,
+            unsafe_allow_html=True,
+        )
+    with columna_pregunta:
+        with st.container(key="selector_portal_dialogo"):
+            st.markdown("### ¿Qué quiere saber?")
+            st.caption(
+                "Seleccione una preevaluación. El mapa mostrará únicamente los controles "
+                "y resultados necesarios para esa pregunta."
+            )
+            modo = st.radio(
+                "Tipo de preevaluación",
+                modos,
+                format_func=lambda valor: MODOS_ANALISIS[valor]["titulo"],
+                captions=[MODOS_ANALISIS[valor]["descripcion"] for valor in modos],
+                key="selector_modo_inicio",
+                label_visibility="collapsed",
+                width="stretch",
+            )
+            st.caption(f"Recibirá: {MODOS_ANALISIS[modo]['resultado']}")
+
+    cancelar, continuar = st.columns([1, 1])
+    if cancelar.button("Cancelar", use_container_width=True):
+        cerrar_selector_analisis()
+        st.rerun()
+    if continuar.button(
+        "Abrir plataforma",
+        type="primary",
+        use_container_width=True,
+    ):
+        elegir_modo(modo)
+        st.rerun()
 
 
 def abrir_vista(vista):
@@ -510,6 +568,7 @@ if st.session_state.get("seccion_tablero") == "Análisis":
 
 seccion_consulta = str(st.query_params.get("seccion", "")).strip().lower()
 modo_consulta = str(st.query_params.get("modo", "")).strip().lower()
+selector_consulta = str(st.query_params.get("selector", "")).strip().lower()
 if (
     modo_consulta in MODOS_ANALISIS
     and st.session_state.get("modo_analisis") != modo_consulta
@@ -570,7 +629,9 @@ if modo_analisis not in MODOS_ANALISIS:
 
 if modo_analisis is None:
     mostrar_hero_inicio()
-    mostrar_tarjetas_modos(MODOS_ANALISIS)
+    mostrar_acceso_selector()
+    if selector_consulta in {"1", "true", "si", "sí"}:
+        mostrar_selector_dialogo()
     st.stop()
 
 

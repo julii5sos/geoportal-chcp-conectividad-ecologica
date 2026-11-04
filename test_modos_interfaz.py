@@ -96,12 +96,24 @@ class ModosInterfazTests(unittest.TestCase):
 
         self.assertFalse(app.exception)
         html_portada = "\n".join(bloque.value for bloque in app.markdown)
-        self.assertIn('class="ref-mode-cards"', html_portada)
-        self.assertIn("Preevaluación territorial", html_portada)
-        self.assertIn("Corredores y conectividad", html_portada)
-        self.assertIn("Preevaluación integral", html_portada)
-        for modo in ("territorial", "corredores", "integral"):
-            self.assertIn(f"seccion=mapa&amp;modo={modo}", html_portada)
+        self.assertIn('class="ref-selector-entry"', html_portada)
+        self.assertIn("Realizar análisis", html_portada)
+        self.assertNotIn('class="ref-mode-cards"', html_portada)
+
+        app.query_params["seccion"] = "inicio"
+        app.query_params["selector"] = "1"
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.radio), 1)
+        self.assertEqual(
+            app.radio[0].options,
+            [
+                "Preevaluación territorial",
+                "Corredores y conectividad",
+                "Preevaluación integral",
+            ],
+        )
+        self.assertTrue(any(boton.label == "Abrir plataforma" for boton in app.button))
 
     def test_navegacion_explica_objetivo_y_metodo_sin_iniciar_el_motor(self):
         app = AppTest.from_file("app.py", default_timeout=30).run()
@@ -239,7 +251,8 @@ class ModosInterfazTests(unittest.TestCase):
         self.assertIn(".ref-nav-btns>.ref-btn-w{display:none}", portal)
         self.assertNotIn(".ref-nav-btns{margin-left:auto}.ref-btn-w{display:none}", portal)
         self.assertIn('class="ref-mobile-menu"', portal)
-        self.assertIn('href="#seleccionar-analisis">Elegir análisis', portal)
+        self.assertIn('href="?seccion=inicio&amp;selector=1" target="_self"', portal)
+        self.assertNotIn('target="_blank"', portal)
         self.assertIn('APP_VERSION = "UX-5.3-HTML-EXACTO-LIMITES-LOCALES"', visor)
         self.assertIn("st.columns([3, 1]", visor)
         self.assertIn("height=780", visor)
