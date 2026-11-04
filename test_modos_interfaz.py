@@ -106,6 +106,20 @@ class ModosInterfazTests(unittest.TestCase):
     def test_navegacion_explica_objetivo_y_metodo_sin_iniciar_el_motor(self):
         app = AppTest.from_file("app.py", default_timeout=30).run()
 
+        app.query_params["seccion"] = "objetivo"
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any("Propósito y utilidad" in bloque.value for bloque in app.markdown)
+        )
+
+        app.query_params["seccion"] = "datos"
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any("Capas territoriales del portal" in bloque.value for bloque in app.markdown)
+        )
+
         app.query_params["seccion"] = "metodo"
         app.run()
         self.assertFalse(app.exception)
@@ -115,7 +129,7 @@ class ModosInterfazTests(unittest.TestCase):
                 for bloque in app.markdown
             )
         )
-        self.assertTrue(any(boton.label == "Abrir el mapa" for boton in app.button))
+        self.assertTrue(any(boton.label == "Elegir análisis" for boton in app.button))
 
         app.query_params["seccion"] = "acerca"
         app.run()
@@ -123,7 +137,15 @@ class ModosInterfazTests(unittest.TestCase):
         self.assertTrue(
             any("Qué problema ayuda a resolver" in bloque.value for bloque in app.markdown)
         )
-        self.assertTrue(any(boton.label == "Abrir el mapa" for boton in app.button))
+        self.assertTrue(any(boton.label == "Elegir análisis" for boton in app.button))
+
+    def test_modo_url_no_cierra_resultados_en_cada_recarga(self):
+        codigo = Path("app.py").read_text(encoding="utf-8")
+
+        self.assertIn(
+            'st.session_state.get("modo_analisis") != modo_consulta', codigo
+        )
+        self.assertIn('st.session_state["selector_modo_sidebar"] = modo_consulta', codigo)
 
     def test_la_navegacion_principal_permanece_antes_del_selector_de_enfoque(self):
         codigo = Path("app.py").read_text(encoding="utf-8")
@@ -214,6 +236,10 @@ class ModosInterfazTests(unittest.TestCase):
         self.assertIn("WGS 84 · EPSG:4326", portal)
         self.assertIn("#0a4393", portal.lower())
         self.assertIn("#77cc09", portal.lower())
+        self.assertIn(".ref-nav-btns>.ref-btn-w{display:none}", portal)
+        self.assertNotIn(".ref-nav-btns{margin-left:auto}.ref-btn-w{display:none}", portal)
+        self.assertIn('class="ref-mobile-menu"', portal)
+        self.assertIn('href="#seleccionar-analisis">Elegir análisis', portal)
         self.assertIn('APP_VERSION = "UX-5.3-HTML-EXACTO-LIMITES-LOCALES"', visor)
         self.assertIn("st.columns([3, 1]", visor)
         self.assertIn("height=780", visor)
@@ -222,7 +248,11 @@ class ModosInterfazTests(unittest.TestCase):
         self.assertIn('["Capas", "Polígono", "Mapa base"]', visor)
         self.assertIn('key="acciones_sidebar"', visor)
         self.assertIn('"Realizar análisis"', visor)
-        self.assertIn('"Resultados"', visor)
+        self.assertIn('"Resultados y descargas"', visor)
+        self.assertIn('"Tipo de preevaluación"', visor)
+        self.assertIn('on_change=cambiar_modo_desde_sidebar', visor)
+        self.assertNotIn('key="cambiar_enfoque_sidebar"', visor)
+        self.assertNotIn('key="abrir_resultados_sidebar"', visor)
         self.assertIn('"Imagen satelital"', visor)
         self.assertIn('"Mapa claro"', visor)
         self.assertIn('"OpenStreetMap"', visor)

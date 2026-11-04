@@ -30,10 +30,14 @@ st.set_page_config(
 st.session_state["_pagina_configurada"] = True
 
 SECCION_MAPA = "Mapa"
+SECCION_OBJETIVO = "Conoce la herramienta"
+SECCION_DATOS = "Uso de datos"
 SECCION_METODO = "Metodología y ayuda"
 SECCION_ACERCA = "Acerca del visor"
 SECCIONES_PRINCIPALES = (
     SECCION_MAPA,
+    SECCION_OBJETIVO,
+    SECCION_DATOS,
     SECCION_METODO,
     SECCION_ACERCA,
 )
@@ -154,15 +158,30 @@ def mostrar_cabecera_portal(seccion=SECCION_MAPA):
 
 def elegir_modo(modo):
     st.session_state["modo_analisis"] = modo
+    st.session_state["selector_modo_sidebar"] = modo
     st.session_state["seccion_tablero"] = SECCION_MAPA
     st.session_state["mostrar_resultados"] = False
     st.query_params["seccion"] = "mapa"
+    st.query_params["modo"] = modo
+
+
+def abrir_selector_analisis():
+    """Regresa al inicio sin conservar un enfoque anterior en sesión o URL."""
+
+    st.session_state.pop("modo_analisis", None)
+    st.session_state.pop("selector_modo_sidebar", None)
+    st.session_state["mostrar_resultados"] = False
+    st.session_state["seccion_tablero"] = SECCION_MAPA
+    st.query_params.clear()
+    st.query_params["seccion"] = "inicio"
 
 
 def abrir_vista(vista):
     st.session_state["seccion_tablero"] = vista
     st.query_params["seccion"] = {
         SECCION_MAPA: "mapa",
+        SECCION_OBJETIVO: "objetivo",
+        SECCION_DATOS: "datos",
         SECCION_METODO: "metodo",
         SECCION_ACERCA: "acerca",
     }.get(vista, "mapa")
@@ -240,11 +259,10 @@ def mostrar_objetivo():
         unsafe_allow_html=True,
     )
     st.button(
-        "Abrir el mapa",
+        "Elegir análisis",
         type="primary",
         width="stretch",
-        on_click=abrir_vista,
-        args=(SECCION_MAPA,),
+        on_click=abrir_selector_analisis,
     )
 
 
@@ -377,11 +395,63 @@ def mostrar_metodo():
         )
 
     st.button(
-        "Abrir el mapa",
+        "Elegir análisis",
         type="primary",
         width="stretch",
-        on_click=abrir_vista,
-        args=(SECCION_MAPA,),
+        on_click=abrir_selector_analisis,
+    )
+
+
+def mostrar_datos():
+    mostrar_cabecera(
+        "Uso y atribución de los datos",
+        "Cada capa conserva su función, su escala y su fuente original.",
+        "Los límites de la cuenca y las subcuencas se sirven desde archivos locales del portal. "
+        "Las capas ráster se consultan en Google Earth Engine únicamente para el área elegida.",
+        "Los productos no se fusionan en una verdad única: cada uno aporta una evidencia diferente",
+    )
+    st.markdown("## Capas territoriales del portal")
+    st.markdown(
+        """
+        <div class="alcance-grid">
+          <section class="alcance-card">
+            <h3>Límites locales</h3>
+            <ul>
+              <li>límite de la Cuenca Hidrográfica del Canal de Panamá;</li>
+              <li>subcuencas incluidas en el archivo territorial del portal;</li>
+              <li>se usan para seleccionar, recortar y centrar el análisis.</li>
+            </ul>
+          </section>
+          <section class="alcance-card">
+            <h3>Capas de análisis</h3>
+            <ul>
+              <li>JRC TMF, Hansen, ESRI, Sentinel-2 NDVI y GEDI;</li>
+              <li>corredores publicados y bosque 2021 para conectividad;</li>
+              <li>relieve e hidrología como componentes del ERI indicativo.</li>
+            </ul>
+          </section>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("## Principios de uso")
+    st.markdown(
+        """
+        - La aplicación consulta solo las capas necesarias para el análisis seleccionado.
+        - Las fechas, resoluciones y definiciones no son idénticas entre productos.
+        - Una coincidencia entre fuentes aumenta la evidencia para revisar, pero no confirma una causa.
+        - La atribución técnica completa acompaña los resultados y las descargas metodológicas.
+        """
+    )
+    st.info(
+        "El visor presenta una preevaluación. Los resultados deben contrastarse con "
+        "conocimiento local, documentos, imágenes recientes y verificación de campo."
+    )
+    st.button(
+        "Elegir análisis",
+        type="primary",
+        width="stretch",
+        on_click=abrir_selector_analisis,
     )
 
 
@@ -428,11 +498,10 @@ def mostrar_acerca():
         unsafe_allow_html=True,
     )
     st.button(
-        "Abrir el mapa",
+        "Elegir análisis",
         type="primary",
         width="stretch",
-        on_click=abrir_vista,
-        args=(SECCION_MAPA,),
+        on_click=abrir_selector_analisis,
     )
 
 
@@ -441,16 +510,25 @@ if st.session_state.get("seccion_tablero") == "Análisis":
 
 seccion_consulta = str(st.query_params.get("seccion", "")).strip().lower()
 modo_consulta = str(st.query_params.get("modo", "")).strip().lower()
-if modo_consulta in MODOS_ANALISIS:
+if (
+    modo_consulta in MODOS_ANALISIS
+    and st.session_state.get("modo_analisis") != modo_consulta
+):
     st.session_state["modo_analisis"] = modo_consulta
+    st.session_state["selector_modo_sidebar"] = modo_consulta
     st.session_state["seccion_tablero"] = SECCION_MAPA
     st.session_state["mostrar_resultados"] = False
 if seccion_consulta == "inicio":
     st.session_state.pop("modo_analisis", None)
+    st.session_state.pop("selector_modo_sidebar", None)
     st.session_state["seccion_tablero"] = SECCION_MAPA
 elif seccion_consulta in {"mapa", "plataforma"}:
     st.session_state["seccion_tablero"] = SECCION_MAPA
-elif seccion_consulta in {"metodo", "datos"}:
+elif seccion_consulta == "objetivo":
+    st.session_state["seccion_tablero"] = SECCION_OBJETIVO
+elif seccion_consulta == "datos":
+    st.session_state["seccion_tablero"] = SECCION_DATOS
+elif seccion_consulta == "metodo":
     st.session_state["seccion_tablero"] = SECCION_METODO
 elif seccion_consulta in {"acerca", "faq"}:
     st.session_state["seccion_tablero"] = SECCION_ACERCA
@@ -465,11 +543,18 @@ mostrar_cabecera_portal(seccion_tablero)
 seccion_anterior = st.session_state.get("_seccion_publica_anterior")
 if (
     seccion_tablero == SECCION_MAPA
-    and seccion_anterior in (SECCION_METODO, SECCION_ACERCA)
+    and seccion_anterior
+    in (SECCION_OBJETIVO, SECCION_DATOS, SECCION_METODO, SECCION_ACERCA)
 ):
     st.session_state["mostrar_resultados"] = False
 st.session_state["_seccion_publica_anterior"] = seccion_tablero
 
+if seccion_tablero == SECCION_OBJETIVO:
+    mostrar_objetivo()
+    st.stop()
+if seccion_tablero == SECCION_DATOS:
+    mostrar_datos()
+    st.stop()
 if seccion_tablero == SECCION_METODO:
     mostrar_metodo()
     st.stop()

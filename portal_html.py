@@ -30,6 +30,8 @@ button,[role="button"]{min-height:44px;}
 
 /* Encabezado: copia de la composición del HTML entregado. */
 .ref-nav{position:fixed;inset:0 0 auto 0;z-index:999999;height:var(--nav-h);background:var(--azul);color:#fff;box-shadow:none;}
+.ref-skip{position:fixed;left:16px;top:-70px;z-index:1000000;padding:10px 14px;border-radius:0 0 4px 4px;background:#fff;color:var(--azul)!important;font-weight:700;text-decoration:none;}
+.ref-skip:focus{top:0;}
 .ref-nav-in{max-width:1800px;height:100%;margin:0 auto;padding:0 max(24px,env(safe-area-inset-right,0px)) 0 max(24px,env(safe-area-inset-left,0px));}
 .ref-util{height:35px;display:flex;justify-content:flex-end;align-items:center;gap:22px;font-size:12.5px;}
 .ref-util a,.ref-util span{color:#fff;text-decoration:none;opacity:.94;}
@@ -48,6 +50,17 @@ button,[role="button"]{min-height:44px;}
 .ref-btn-w{background:#fff;color:var(--azul)!important;}
 .ref-btn-o{border-color:rgba(255,255,255,.85);background:transparent;color:#fff!important;}
 .ref-btn svg{width:15px;height:15px;}
+.ref-lang,.ref-mobile-menu{position:relative;}
+.ref-lang>summary,.ref-mobile-menu>summary{list-style:none;cursor:pointer;}
+.ref-lang>summary::-webkit-details-marker,.ref-mobile-menu>summary::-webkit-details-marker{display:none;}
+.ref-lang-menu,.ref-mobile-links{position:absolute;right:0;top:calc(100% + 7px);min-width:160px;padding:7px;border:1px solid var(--line);border-radius:var(--r);background:#fff;box-shadow:var(--portal-shadow);color:var(--ink);}
+.ref-lang-menu button{display:flex;width:100%;min-height:40px;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:13.5px;text-align:left;}
+.ref-lang-menu button[disabled]{color:var(--faint);cursor:default;}
+.ref-mobile-menu{display:none;}
+.ref-burger{display:inline-flex;min-height:42px;align-items:center;justify-content:center;padding:8px 16px;border:1.5px solid rgba(255,255,255,.85);border-radius:999px;color:#fff;font-size:13px;font-weight:700;}
+.ref-mobile-links{display:flex;min-width:240px;flex-direction:column;padding:8px;}
+.ref-mobile-links a{display:block;min-height:44px;padding:12px;border-radius:4px;color:var(--azul)!important;font-size:13px;font-weight:700;text-decoration:none!important;}
+.ref-mobile-links a:hover{background:var(--azul-suave);}
 
 /* Portada del portal. */
 .ref-hero{position:relative;min-height:455px;margin:-12px -14px 0;background:var(--azul);color:#fff;overflow:hidden;}
@@ -120,9 +133,9 @@ iframe[title="streamlit_folium.st_folium"]{display:block;border:0!important;bord
 [data-testid="stVegaLiteChart"]{border:1px solid var(--line)!important;border-radius:var(--r)!important;background:#fff!important;box-shadow:none!important;}
 [data-testid="stMetric"]{border:0!important;border-radius:var(--r)!important;background:var(--azul-suave)!important;}
 
-@media(max-width:1240px){.ref-links{display:none}.ref-main-row{gap:12px}.ref-nav-btns{margin-left:auto}.ref-btn-w{display:none}}
+@media(max-width:1240px){.ref-links{display:none}.ref-main-row{gap:12px}.ref-nav-btns{margin-left:auto}.ref-nav-btns>.ref-btn-w{display:none}.ref-mobile-menu{display:block}}
 @media(max-width:900px){
-  :root{--nav-h:76px}.ref-util{display:none}.ref-main-row{height:76px}.ref-nav-in{padding:0 16px}.ref-wm b{font-size:18px}.ref-wm small{font-size:7.5px}.ref-btn-o{display:none}
+  :root{--nav-h:76px}.ref-util{display:none}.ref-main-row{height:76px}.ref-nav-in{padding:0 16px}.ref-wm b{font-size:18px}.ref-wm small{font-size:7.5px}.ref-lang{display:none}
   .block-container{padding:calc(var(--nav-h) + 8px) 10px 12px!important}
   [data-testid="stSidebar"]{top:var(--nav-h)!important;height:calc(100vh - var(--nav-h))!important}
   [data-testid="stSidebar"][data-collapsed="false"]{width:min(340px,100vw)!important;min-width:min(340px,100vw)!important;max-width:min(340px,100vw)!important}
@@ -147,27 +160,40 @@ def inyectar_estilo_portal() -> None:
 def mostrar_navegacion_portal(seccion: str) -> None:
     activa = {
         "mapa": seccion == "Mapa",
+        "objetivo": seccion == "Conoce la herramienta",
+        "datos": seccion == "Uso de datos",
         "metodo": seccion == "Metodología y ayuda",
         "acerca": seccion == "Acerca del visor",
     }
+    modo_actual = st.session_state.get("modo_analisis")
+    destino_plataforma = (
+        f"?seccion=mapa&amp;modo={html.escape(str(modo_actual))}"
+        if modo_actual
+        else "?seccion=inicio#seleccionar-analisis"
+    )
 
     def actual(clave: str) -> str:
         return ' aria-current="page"' if activa[clave] else ""
 
     st.markdown(
         f"""
+        <a class="ref-skip" href="#stMain">Saltar al contenido principal</a>
         <header class="ref-nav">
           <div class="ref-nav-in">
-            <div class="ref-util"><a href="?seccion=inicio">Inicio</a><a href="?seccion=metodo">Atribución de datos</a><span>WGS 84 · EPSG:4326</span></div>
+            <div class="ref-util"><a href="?seccion=inicio">Inicio</a><a href="?seccion=datos">Atribución de datos</a><span>WGS 84 · EPSG:4326</span></div>
             <div class="ref-main-row">
               <a class="ref-wm" href="?seccion=inicio" aria-label="Inicio · Conectividad Panamá">{LOGO_PORTAL}<span><b>Conectividad Panamá</b><small>Cuenca del Canal de Panamá</small></span></a>
               <nav class="ref-links" aria-label="Secciones">
-                <a href="?seccion=metodo"{actual('metodo')}>Conoce la herramienta<i class="ref-chev"></i></a>
-                <a href="?seccion=mapa"{actual('mapa')}>Plataforma<i class="ref-chev"></i></a>
-                <a href="?seccion=metodo">Uso de datos<i class="ref-chev"></i></a>
+                <a href="?seccion=objetivo"{actual('objetivo')}>Conoce la herramienta<i class="ref-chev"></i></a>
+                <a href="{destino_plataforma}"{actual('mapa')}>Plataforma<i class="ref-chev"></i></a>
+                <a href="?seccion=datos"{actual('datos')}>Uso de datos<i class="ref-chev"></i></a>
                 <a href="?seccion=acerca"{actual('acerca')}>FAQ<i class="ref-chev"></i></a>
               </nav>
-              <div class="ref-nav-btns"><a class="ref-btn ref-btn-w" href="?seccion=mapa">Explorar datos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a><span class="ref-btn ref-btn-o">ES <i class="ref-chev"></i></span></div>
+              <div class="ref-nav-btns">
+                <a class="ref-btn ref-btn-w" href="{destino_plataforma}">Explorar datos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+                <details class="ref-lang"><summary class="ref-btn ref-btn-o" aria-label="Idioma: español">ES <i class="ref-chev"></i></summary><div class="ref-lang-menu"><button type="button" aria-checked="true">Español <span>✓</span></button><button type="button" disabled>English <span>pronto</span></button></div></details>
+                <details class="ref-mobile-menu"><summary class="ref-burger">Menú</summary><nav class="ref-mobile-links" aria-label="Secciones móviles"><a href="?seccion=objetivo">Conoce la herramienta</a><a href="{destino_plataforma}">Plataforma</a><a href="?seccion=datos">Uso de datos</a><a href="?seccion=acerca">FAQ</a></nav></details>
+              </div>
             </div>
           </div>
         </header>
@@ -183,7 +209,7 @@ def mostrar_hero_inicio() -> None:
           <div class="ref-hero-in">
             <h1>Conectividad ecológica de la Cuenca del Canal de Panamá</h1>
             <p>Portal SIG para detectar dónde hay conectividad, dónde hay fragmentación, dónde se está perdiendo bosque y dónde conviene revisar. Integra JRC, Hansen, ESRI, GEDI y Sentinel en Google Earth Engine, los corredores de Almanaque Azul, el bosque 2021 de MiAMBIENTE y el Índice de Resiliencia Ecológica (ERI).</p>
-            <div class="ref-acts"><a class="ref-btn ref-btn-w" href="?seccion=mapa">Abrir la plataforma</a><a class="ref-btn ref-btn-o" href="?seccion=metodo">Conocer el método</a></div>
+            <div class="ref-acts"><a class="ref-btn ref-btn-w" href="#seleccionar-analisis">Elegir análisis</a><a class="ref-btn ref-btn-o" href="?seccion=metodo">Conocer el método</a></div>
           </div>
           <svg class="ref-hero-cut" viewBox="0 0 1440 150" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,150 1440,40 1440,150" fill="#fff"/><g fill="none" stroke="#fabc20" stroke-opacity=".7" stroke-width="1.3"><path d="M1150 150 C1210 112 1320 96 1440 92"/><path d="M1200 150 C1255 120 1340 108 1440 106"/><path d="M1250 150 C1300 128 1365 120 1440 119"/></g><polygon points="960,62.7 1440,26 1440,34 960,70.7" fill="#fff"/><polygon points="880,78.8 1440,36 1440,46 880,88.8" fill="#77cc09"/><polygon points="990,84.4 1440,50 1440,59 990,93.4" fill="#fabc20"/></svg>
         </section>
@@ -216,7 +242,7 @@ def mostrar_tarjetas_modos(modos: dict[str, dict[str, str]]) -> None:
         )
 
     st.markdown(
-        '<section class="ref-modes"><div class="ref-mode-cards">'
+        '<section class="ref-modes" id="seleccionar-analisis"><div class="ref-mode-cards">'
         + "".join(tarjetas)
         + "</div></section>",
         unsafe_allow_html=True,

@@ -5613,6 +5613,19 @@ def establecer_modo_analisis(modo):
     st.session_state.pop("capa_a_reordenar", None)
 
 
+def cambiar_modo_desde_sidebar():
+    """Sincroniza el selector del portal con la sesión y la URL pública."""
+
+    nuevo_modo = st.session_state.get("selector_modo_sidebar")
+    if nuevo_modo not in MODOS_ANALISIS:
+        return
+    if nuevo_modo != st.session_state.get("modo_analisis"):
+        establecer_modo_analisis(nuevo_modo)
+    st.query_params.clear()
+    st.query_params["seccion"] = "mapa"
+    st.query_params["modo"] = nuevo_modo
+
+
 def abrir_resultados_contextuales():
     st.session_state["mostrar_resultados"] = True
 
@@ -6885,16 +6898,16 @@ try:
     )
 
     panel_filtros.markdown("### Área de análisis")
-    if panel_filtros.button(
-        "Cambiar enfoque",
-        use_container_width=True,
-        key="cambiar_enfoque_sidebar",
-        help="Volver a la selección de preevaluación territorial, conectividad o análisis integral.",
-    ):
-        limpiar_estado_resultados()
-        st.session_state.pop("modo_analisis", None)
-        st.session_state["mostrar_resultados"] = False
-        st.rerun()
+    if st.session_state.get("selector_modo_sidebar") not in MODOS_ANALISIS:
+        st.session_state["selector_modo_sidebar"] = modo_analisis
+    panel_filtros.selectbox(
+        "Tipo de preevaluación",
+        list(MODOS_ANALISIS),
+        format_func=lambda valor: MODOS_ANALISIS[valor]["titulo"],
+        key="selector_modo_sidebar",
+        on_change=cambiar_modo_desde_sidebar,
+        help="Cambia la lectura del portal y conserva el área seleccionada cuando es compatible.",
+    )
     etiquetas_area = {
         "Finca de monitoreo": "Finca registrada (recomendado)",
         "Subcuenca": "Subcuenca de la CHCP",
@@ -7517,28 +7530,13 @@ try:
         )
         solicitar_analisis = False
     else:
-        columna_analizar = acciones_sidebar
-        columna_resultados = None
-        if analisis_actual:
-            columna_analizar, columna_resultados = acciones_sidebar.columns([1.1, 1])
-        solicitar_analisis = columna_analizar.button(
+        solicitar_analisis = acciones_sidebar.button(
             "Actualizar" if analisis_actual else "Realizar análisis",
             type="primary",
             use_container_width=True,
             key="crear_analisis_panel",
             help=f"Procesa únicamente la información de {contenido_modo['titulo'].lower()}.",
         )
-        if columna_resultados is not None:
-            columna_resultados.button(
-                "Resultados",
-                use_container_width=True,
-                key="abrir_resultados_sidebar",
-                on_click=abrir_resultados_contextuales,
-                help=(
-                    "Abre las tablas completas, la gráfica temporal por fuente y los "
-                    "archivos de respaldo."
-                ),
-            )
 
     if seccion_tablero == "Análisis":
         st.markdown("### Resultados y descargas")
@@ -7628,6 +7626,16 @@ try:
                     geometria_geojson=geometria_dibujada_json,
                     capas_activas=capas_activas,
                 )
+            st.button(
+                "Resultados y descargas",
+                use_container_width=True,
+                key="abrir_resultados_panel",
+                on_click=abrir_resultados_contextuales,
+                help=(
+                    "Abre las tablas completas, las gráficas por fuente y los archivos "
+                    "de respaldo de la preevaluación."
+                ),
+            )
         if solicitar_analisis:
             firma_anterior = st.session_state.get("firma_analisis")
             with st.status(
