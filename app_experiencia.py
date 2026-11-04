@@ -59,6 +59,7 @@ from eri_indicativo import (
     PESOS_ERI,
     construir_resultado_eri,
 )
+from geoportal_componentes import mostrar_portal_sin_motor
 from metodologia_indice import (
     CLASES_VIGOR_NDVI,
     JUSTIFICACION_PESOS,
@@ -1112,7 +1113,7 @@ def secreto_opcional(nombre, predeterminado=None):
         return predeterminado
 
 
-APP_VERSION = "UX-5.3-HTML-EXACTO-LIMITES-LOCALES"
+APP_VERSION = "GEO-CHCP-2.0-FIDELIDAD-HTML"
 
 MAPAS_BASE = {
     "Imagen satelital": {
@@ -1195,6 +1196,7 @@ ANO_TMF_MAX = PERIODOS_ANALISIS["jrc_diagnostico"]
 ANO_DIAG_TMF = PERIODOS_ANALISIS["jrc_diagnostico"]
 ANO_ESRI_MIN = PERIODOS_ANALISIS["esri_inicial"]
 ANO_ESRI_MAX = PERIODOS_ANALISIS["esri_final"]
+ANO_ESRI_VISUAL_MAX = PERIODOS_ANALISIS["esri_final_visual"]
 ANO_NDVI_INICIAL_ANALISIS = PERIODOS_ANALISIS["ndvi_inicial"]
 ANO_NDVI_FINAL_ANALISIS = PERIODOS_ANALISIS["ndvi_final"]
 ANO_NDVI_MAX = PERIODOS_ANALISIS["ndvi_final_visual"]
@@ -2195,7 +2197,7 @@ def obtener_tmf(anio, geometria):
 
 
 def obtener_esri(anio, geometria):
-    anio_seguro = max(ANO_ESRI_MIN, min(ANO_ESRI_MAX, anio))
+    anio_seguro = max(ANO_ESRI_MIN, min(ANO_ESRI_VISUAL_MAX, anio))
     nombre_banda = f"esri_{anio_seguro}"
     coleccion_anual_esri = (
         ee.ImageCollection(ESRI_ASSET)
@@ -2850,7 +2852,7 @@ def calcular_serie_fuente(
         }
 
     if fuente == "ESRI Land Use / Land Cover":
-        anios = list(range(ANO_ESRI_MIN, ANO_ESRI_MAX + 1))
+        anios = list(range(ANO_ESRI_MIN, ANO_ESRI_VISUAL_MAX + 1))
         bandas = [
             obtener_esri(anio, geometria)
             .eq(2)
@@ -2863,7 +2865,7 @@ def calcular_serie_fuente(
             ee.Image.cat(bandas),
             geometria,
             10,
-            obtener_esri(ANO_ESRI_MAX, geometria).projection(),
+            obtener_esri(ANO_ESRI_VISUAL_MAX, geometria).projection(),
         ).getInfo()
         return {
             "titulo": "Cobertura arbórea anual según ESRI",
@@ -5622,16 +5624,24 @@ def cambiar_modo_desde_sidebar():
     if nuevo_modo != st.session_state.get("modo_analisis"):
         establecer_modo_analisis(nuevo_modo)
     st.query_params.clear()
-    st.query_params["seccion"] = "mapa"
+    st.query_params["seccion"] = "analizar"
     st.query_params["modo"] = nuevo_modo
 
 
 def abrir_resultados_contextuales():
     st.session_state["mostrar_resultados"] = True
+    st.session_state["vista_geoportal"] = "resultados"
+    st.query_params.clear()
+    st.query_params["seccion"] = "resultados"
+    st.query_params["modo"] = st.session_state.get("modo_analisis", MODO_INTEGRAL)
 
 
 def volver_al_mapa():
     st.session_state["mostrar_resultados"] = False
+    st.session_state["vista_geoportal"] = "explorar"
+    st.query_params.clear()
+    st.query_params["seccion"] = "explorar"
+    st.query_params["modo"] = st.session_state.get("modo_analisis", MODO_TERRITORIAL)
 
 
 def mostrar_selector_modos():
@@ -6849,6 +6859,7 @@ def mostrar_resultados_fragmentacion(resultados):
 # -----------------------------------------------------------------------------
 
 modo_analisis = st.session_state.get("modo_analisis")
+vista_geoportal = st.session_state.get("vista_geoportal", "explorar")
 seccion_tablero = (
     "Análisis" if st.session_state.get("mostrar_resultados", False) else "Mapa"
 )
@@ -6862,8 +6873,8 @@ if modo_analisis is None:
         <div class="cabecera-app">
           <h1>Preevaluación territorial y corredores</h1>
           <div class="subtitulo-app">Evidencia inicial para orientar dónde conviene revisar</div>
-          <p>Primero elija qué necesita conocer. Después seleccione una finca, una
-          subcuenca, un polígono o toda la cuenca.</p>
+          <p>Primero elija qué necesita conocer. Después dibuje un polígono,
+          seleccione una subcuenca o consulte toda la cuenca.</p>
           <div class="alcance-app">Resultado indicativo · requiere interpretación y
           verificación de campo · no determina cumplimiento EUDR</div>
         </div>
@@ -6879,8 +6890,10 @@ contenido_modo = MODOS_ANALISIS[modo_analisis]
 analiza_cambios = modo_analisis in (MODO_TERRITORIAL, MODO_INTEGRAL)
 analiza_conectividad = modo_analisis in (MODO_CORREDORES, MODO_INTEGRAL)
 
+motor_earth_engine_iniciado = False
 try:
     iniciar_earth_engine()
+    motor_earth_engine_iniciado = True
 
     panel_capas, panel_filtros, panel_mapa_base = st.sidebar.tabs(
         ["Capas", "Polígono", "Mapa base"]
@@ -6900,51 +6913,41 @@ try:
     panel_filtros.markdown("### Área de análisis")
     if st.session_state.get("selector_modo_sidebar") not in MODOS_ANALISIS:
         st.session_state["selector_modo_sidebar"] = modo_analisis
-    panel_filtros.selectbox(
-        "Tipo de preevaluación",
-        list(MODOS_ANALISIS),
-        format_func=lambda valor: MODOS_ANALISIS[valor]["titulo"],
-        key="selector_modo_sidebar",
-        on_change=cambiar_modo_desde_sidebar,
-        help="Cambia la lectura del portal y conserva el área seleccionada cuando es compatible.",
-    )
+    if vista_geoportal == "analizar":
+        panel_filtros.selectbox(
+            "Tipo de preevaluación",
+            list(MODOS_ANALISIS),
+            format_func=lambda valor: MODOS_ANALISIS[valor]["titulo"],
+            key="selector_modo_sidebar",
+            on_change=cambiar_modo_desde_sidebar,
+            help="Cambia la lectura del portal y conserva el área seleccionada cuando es compatible.",
+        )
+    else:
+        panel_filtros.caption(
+            f"Módulo: {vista_geoportal.capitalize()} · {contenido_modo['titulo']}"
+        )
     etiquetas_area = {
-        "Finca de monitoreo": "Finca registrada (recomendado)",
         "Subcuenca": "Subcuenca de la CHCP",
         "Dibujar polígono en el mapa": "Dibujar un área en el mapa",
         "Toda la cuenca": "Toda la cuenca (análisis regional)",
     }
     descripciones_area = {
-        "Finca de monitoreo": "Seleccione una finca registrada.",
         "Subcuenca": "Se recorta automáticamente al límite de la CHCP.",
         "Dibujar polígono en el mapa": "La parte exterior de la CHCP se excluye.",
         "Toda la cuenca": "Análisis regional; puede requerir más tiempo.",
     }
     tipo_area = panel_filtros.selectbox(
         "Unidad territorial",
-        ["Finca de monitoreo", "Subcuenca", "Dibujar polígono en el mapa", "Toda la cuenca"],
+        [TIPO_AREA_DIBUJADA, TIPO_AREA_SUBCUENCA, "Toda la cuenca"],
         format_func=lambda valor: etiquetas_area[valor],
-        help="Se recomienda iniciar con una finca. El análisis de toda la cuenca puede tardar varios minutos.",
+        help="El dibujo es la opción principal. También puede usar una subcuenca o toda la CHCP.",
     )
     panel_filtros.caption(descripciones_area[tipo_area])
     finca_seleccionada = None
     subcuenca_seleccionada = None
     geometria_dibujada_json = st.session_state.get("geometria_dibujada_json")
     version_mapa_dibujo = st.session_state.get("version_mapa_dibujo", 0)
-    if tipo_area == "Finca de monitoreo":
-        if not solicitar_acceso_fincas(panel_filtros):
-            st.info(
-                "El acceso a las fincas está protegido. Ingrese el código en el panel lateral "
-                "o seleccione otra unidad territorial."
-            )
-            st.stop()
-        finca_seleccionada = panel_filtros.selectbox(
-            "Finca:",
-            obtener_ids_fincas(),
-            format_func=str,
-            help="Las fincas están ordenadas de forma natural: 1, 2, 3...",
-        )
-    elif tipo_area == TIPO_AREA_SUBCUENCA:
+    if tipo_area == TIPO_AREA_SUBCUENCA:
         subcuenca_seleccionada = panel_filtros.selectbox(
             "Subcuenca:",
             obtener_ids_subcuencas(),
@@ -7127,6 +7130,12 @@ try:
 
     panel_capas.markdown("### Capas del mapa")
     opciones_objetivo = PERFILES_POR_MODO[modo_analisis]
+    if vista_geoportal == "comparar":
+        opciones_objetivo = [
+            opcion
+            for opcion in PERFILES_POR_MODO[MODO_TERRITORIAL]
+            if PERFILES_VISUALIZACION[opcion]["comparador"] != "Sin comparador"
+        ]
     if len(opciones_objetivo) == 1:
         objetivo = opciones_objetivo[0]
         if modo_analisis == MODO_INTEGRAL:
@@ -7137,6 +7146,7 @@ try:
         objetivo = panel_capas.selectbox(
             "¿Qué desea ver en el mapa?",
             opciones_objetivo,
+            key=f"objetivo_visual_{vista_geoportal}_{modo_analisis}",
             help=(
                 "Puede consultar capas de un solo año o comparar dos años. "
                 "La selección organiza el mapa; no cambia el método de cálculo."
@@ -7186,10 +7196,10 @@ try:
     orden_capas_mapa = list(capas_activas)
     capa_visible_inicial = capas_activas[0] if capas_activas else None
     anio_tmf_inicial, anio_tmf_final = 2020, ANO_TMF_MAX
-    anio_esri_inicial, anio_esri_final = ANO_ESRI_MIN, ANO_ESRI_MAX
+    anio_esri_inicial, anio_esri_final = ANO_ESRI_MIN, ANO_ESRI_VISUAL_MAX
     anio_ndvi_inicial, anio_ndvi_final = 2022, ANO_NDVI_MAX
     anio_tmf_capa = ANO_TMF_MAX
-    anio_esri_capa = ANO_ESRI_MAX
+    anio_esri_capa = ANO_ESRI_VISUAL_MAX
     anio_ndvi_capa = ANO_NDVI_MAX
     mostrar_interseccion_corredores_mapa = False
     mostrar_corredores_contexto_mapa = False
@@ -7222,20 +7232,23 @@ try:
                 f"estado JRC de {ANO_DIAG_TMF}."
             )
         elif modo_comparador == "ESRI LULC":
-            opciones_inicio_esri = list(range(ANO_ESRI_MIN, ANO_ESRI_MAX))
+            opciones_inicio_esri = list(range(ANO_ESRI_MIN, ANO_ESRI_VISUAL_MAX))
             anio_esri_inicial = panel_filtros.selectbox(
                 "Año inicial (ESRI):",
                 opciones_inicio_esri,
             )
-            opciones_final_esri = list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))
+            opciones_final_esri = list(
+                range(anio_esri_inicial + 1, ANO_ESRI_VISUAL_MAX + 1)
+            )
             anio_esri_final = panel_filtros.selectbox(
                 "Año final (ESRI):",
                 opciones_final_esri,
                 index=len(opciones_final_esri) - 1,
             )
             panel_filtros.caption(
-                f"El análisis usa los extremos disponibles {ANO_ESRI_MIN} y "
-                f"{ANO_ESRI_MAX}; esta selección solo cambia el comparador."
+                f"El índice conserva el período metodológico {ANO_ESRI_MIN}–"
+                f"{ANO_ESRI_MAX}; esta selección hasta {ANO_ESRI_VISUAL_MAX} "
+                "solo cambia el comparador."
             )
         else:
             opciones_inicio_ndvi = list(range(2017, ANO_NDVI_MAX))
@@ -7410,7 +7423,7 @@ try:
                     key=f"capa_interseccion_corredores_{modo_analisis}",
                     help=(
                         "Después de crear el análisis muestra únicamente la parte de los "
-                        "corredores que queda dentro de la finca o subcuenca."
+                        "corredores que queda dentro del área seleccionada."
                     ),
                 )
                 mostrar_corredores_contexto_mapa = st.checkbox(
@@ -7585,7 +7598,7 @@ try:
         if tipo_area == "Toda la cuenca":
             st.warning(
                 "El análisis regional puede tardar varios minutos. Para una revisión rápida "
-                "se recomienda seleccionar una finca o subcuenca."
+                "se recomienda dibujar un polígono o seleccionar una subcuenca."
             )
 
         if not analisis_actual:
@@ -8740,6 +8753,9 @@ try:
             )
 
 except Exception as error:
-    mostrar_error_amigable(error)
-    with st.expander("Detalle técnico para soporte", expanded=False):
-        st.code(traceback.format_exc())
+    if not motor_earth_engine_iniciado:
+        mostrar_portal_sin_motor(error, vista_geoportal)
+    else:
+        mostrar_error_amigable(error)
+        with st.expander("Detalle técnico para soporte", expanded=False):
+            st.code(traceback.format_exc())

@@ -115,22 +115,8 @@ class ModosInterfazTests(unittest.TestCase):
         )
         self.assertTrue(any(boton.label == "Abrir plataforma" for boton in app.button))
 
-    def test_navegacion_explica_objetivo_y_metodo_sin_iniciar_el_motor(self):
+    def test_navegacion_v2_explica_metodo_y_acerca_sin_iniciar_el_motor(self):
         app = AppTest.from_file("app.py", default_timeout=30).run()
-
-        app.query_params["seccion"] = "objetivo"
-        app.run()
-        self.assertFalse(app.exception)
-        self.assertTrue(
-            any("Propósito y utilidad" in bloque.value for bloque in app.markdown)
-        )
-
-        app.query_params["seccion"] = "datos"
-        app.run()
-        self.assertFalse(app.exception)
-        self.assertTrue(
-            any("Capas territoriales del portal" in bloque.value for bloque in app.markdown)
-        )
 
         app.query_params["seccion"] = "metodo"
         app.run()
@@ -150,6 +136,35 @@ class ModosInterfazTests(unittest.TestCase):
             any("Qué problema ayuda a resolver" in bloque.value for bloque in app.markdown)
         )
         self.assertTrue(any(boton.label == "Elegir análisis" for boton in app.button))
+
+    def test_navegacion_v2_declara_las_ocho_secciones_y_no_abre_ventanas(self):
+        portal = Path("portal_html.py").read_text(encoding="utf-8")
+
+        for seccion in (
+            "Inicio",
+            "Explorar",
+            "Comparar",
+            "Analizar",
+            "ERI",
+            "Resultados",
+            "Metodología y ayuda",
+            "Acerca del geoportal",
+        ):
+            self.assertIn(seccion, portal)
+        self.assertNotIn('target="_blank"', portal)
+        self.assertIn('target="_self"', portal)
+
+    def test_fincas_no_aparecen_en_el_selector_publico(self):
+        visor = Path("app_experiencia.py").read_text(encoding="utf-8")
+
+        self.assertIn(
+            '[TIPO_AREA_DIBUJADA, TIPO_AREA_SUBCUENCA, "Toda la cuenca"]',
+            visor,
+        )
+        self.assertNotIn(
+            '["Finca de monitoreo", "Subcuenca", "Dibujar polígono en el mapa", "Toda la cuenca"]',
+            visor,
+        )
 
     def test_modo_url_no_cierra_resultados_en_cada_recarga(self):
         codigo = Path("app.py").read_text(encoding="utf-8")
@@ -253,7 +268,7 @@ class ModosInterfazTests(unittest.TestCase):
         self.assertIn('class="ref-mobile-menu"', portal)
         self.assertIn('href="?seccion=inicio&amp;selector=1" target="_self"', portal)
         self.assertNotIn('target="_blank"', portal)
-        self.assertIn('APP_VERSION = "UX-5.3-HTML-EXACTO-LIMITES-LOCALES"', visor)
+        self.assertIn('APP_VERSION = "GEO-CHCP-2.0-FIDELIDAD-HTML"', visor)
         self.assertIn("st.columns([3, 1]", visor)
         self.assertIn("height=780", visor)
         self.assertIn("tipo_area = panel_filtros.selectbox", visor)

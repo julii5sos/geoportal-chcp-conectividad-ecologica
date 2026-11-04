@@ -11,6 +11,7 @@ PERIODOS_ANALISIS = {
     "hansen_diagnostico": 2025,
     "esri_inicial": 2017,
     "esri_final": 2024,
+    "esri_final_visual": 2025,
     "ndvi_inicial": 2020,
     "ndvi_final": 2025,
     "ndvi_final_visual": 2025,

@@ -29,8 +29,8 @@ button,[role="button"]{min-height:44px;}
 :focus-visible{outline:2px solid var(--verde)!important;outline-offset:2px!important;}
 
 /* Encabezado: copia de la composición del HTML entregado. */
-.ref-nav{position:fixed;inset:0 0 auto 0;z-index:999999;height:var(--nav-h);background:var(--azul);color:#fff;box-shadow:none;}
-.ref-skip{position:fixed;left:16px;top:-70px;z-index:1000000;padding:10px 14px;border-radius:0 0 4px 4px;background:#fff;color:var(--azul)!important;font-weight:700;text-decoration:none;}
+.ref-nav{position:fixed;inset:0 0 auto 0;z-index:100;height:var(--nav-h);background:var(--azul);color:#fff;box-shadow:none;}
+.ref-skip{position:fixed;left:16px;top:-70px;z-index:110;padding:10px 14px;border-radius:0 0 4px 4px;background:#fff;color:var(--azul)!important;font-weight:700;text-decoration:none;}
 .ref-skip:focus{top:0;}
 .ref-nav-in{max-width:1800px;height:100%;margin:0 auto;padding:0 max(24px,env(safe-area-inset-right,0px)) 0 max(24px,env(safe-area-inset-left,0px));}
 .ref-util{height:35px;display:flex;justify-content:flex-end;align-items:center;gap:22px;font-size:12.5px;}
@@ -124,9 +124,9 @@ div[role="dialog"] button[aria-label="Close"]{display:grid!important;width:44px!
 .tarjeta p{color:var(--ink)!important;font-size:13.5px!important;}
 
 /* Plataforma cartográfica: panel 340px + mapa + resultados. */
-[data-testid="stSidebar"]{top:var(--nav-h)!important;height:calc(100vh - var(--nav-h))!important;border-right:1px solid var(--line)!important;background:#fff!important;box-shadow:none!important;}
+[data-testid="stSidebar"]{top:var(--nav-h)!important;height:calc(100vh - var(--nav-h))!important;flex:0 0 340px!important;width:340px!important;min-width:340px!important;max-width:340px!important;border-right:1px solid var(--line)!important;background:#fff!important;box-shadow:none!important;}
 [data-testid="stSidebar"][data-collapsed="false"]{width:340px!important;min-width:340px!important;max-width:340px!important;}
-[data-testid="stSidebar"]>div:first-child{height:100%!important;padding:0!important;background:#fff!important;}
+[data-testid="stSidebar"]>div:first-child{width:340px!important;height:100%!important;padding:0!important;background:#fff!important;}
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:8px!important;}
 [data-testid="stSidebar"] h2,[data-testid="stSidebar"] h3{color:var(--azul)!important;}
 [data-testid="stSidebar"] [data-testid="stTabs"] [data-baseweb="tab-list"]{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:0 14px;background:#fff;border-bottom:1px solid var(--line);}
@@ -137,6 +137,9 @@ div[role="dialog"] button[aria-label="Close"]{display:grid!important;width:44px!
 [data-testid="stSidebar"] [data-testid="stExpander"] details[open]{background:#fff!important;}
 [data-testid="stSidebar"] [data-testid="stExpander"] summary{min-height:48px;padding:10px 14px!important;color:var(--azul)!important;font-size:13px!important;font-weight:700!important;}
 [data-testid="stSidebar"] [data-testid="stSelectbox"]>div>div,[data-testid="stSidebar"] [data-baseweb="select"]>div{border-color:var(--azul-linea)!important;border-radius:999px!important;background:#fff!important;}
+.leyenda-fuente{display:grid;grid-template-columns:1fr;gap:5px;margin:8px 0 2px;padding-top:8px;border-top:1px solid var(--line);}
+.leyenda-fuente-item{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11.5px;line-height:1.3;}
+.leyenda-fuente-item i{display:inline-block;flex:0 0 12px;width:12px;height:12px;border:1px solid rgba(6,42,94,.18);border-radius:2px;}
 [data-testid="stSidebar"] .st-key-acciones_sidebar{position:fixed;left:0;bottom:0;z-index:30;width:340px;margin:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:#fff;box-shadow:none;}
 [data-testid="stSidebar"] .st-key-acciones_sidebar button{width:100%;}
 
@@ -150,6 +153,7 @@ div[role="dialog"] button[aria-label="Close"]{display:grid!important;width:44px!
 .st-key-panel_resultados_visible{min-width:0;border-left:1px solid var(--line);background:#fff;}
 .st-key-panel_resultados_oculto{display:none!important;}
 .st-key-mapa_portal{min-width:0;}
+.block-container:has(.mapa-cabecera){padding-top:68px!important;}
 iframe[title="streamlit_folium.st_folium"]{display:block;border:0!important;border-radius:0!important;background:var(--azul-suave)!important;box-shadow:none!important;}
 [data-testid="stVegaLiteChart"]{border:1px solid var(--line)!important;border-radius:var(--r)!important;background:#fff!important;box-shadow:none!important;}
 [data-testid="stMetric"]{border:0!important;border-radius:var(--r)!important;background:var(--azul-suave)!important;}
@@ -158,7 +162,9 @@ iframe[title="streamlit_folium.st_folium"]{display:block;border:0!important;bord
 @media(max-width:900px){
   :root{--nav-h:76px}.ref-util{display:none}.ref-main-row{height:76px}.ref-nav-in{padding:0 16px}.ref-wm b{font-size:18px}.ref-wm small{font-size:7.5px}.ref-lang{display:none}
   .block-container{padding:calc(var(--nav-h) + 8px) 10px 12px!important}
-  [data-testid="stSidebar"]{top:var(--nav-h)!important;height:calc(100vh - var(--nav-h))!important}
+  .block-container:has(.mapa-cabecera){padding-top:26px!important}
+  [data-testid="stSidebar"]{top:var(--nav-h)!important;height:calc(100vh - var(--nav-h))!important;flex-basis:min(340px,100vw)!important;width:min(340px,100vw)!important;min-width:min(340px,100vw)!important;max-width:min(340px,100vw)!important}
+  [data-testid="stSidebar"]>div:first-child{width:min(340px,100vw)!important}
   [data-testid="stSidebar"][data-collapsed="false"]{width:min(340px,100vw)!important;min-width:min(340px,100vw)!important;max-width:min(340px,100vw)!important}
   [data-testid="stSidebar"] .st-key-acciones_sidebar{width:min(340px,100vw)}
   .ref-hero{margin:-8px -10px 0;min-height:420px}.ref-meta{grid-template-columns:1fr 1fr}.ref-meta>div+div{border-left:0;border-top:1px solid var(--azul-linea)}
@@ -180,17 +186,18 @@ def inyectar_estilo_portal() -> None:
 
 def mostrar_navegacion_portal(seccion: str) -> None:
     activa = {
-        "mapa": seccion == "Mapa",
-        "objetivo": seccion == "Conoce la herramienta",
-        "datos": seccion == "Uso de datos",
+        "inicio": seccion == "Inicio",
+        "explorar": seccion == "Explorar",
+        "comparar": seccion == "Comparar",
+        "analizar": seccion == "Analizar",
+        "eri": seccion == "ERI",
+        "resultados": seccion == "Resultados",
         "metodo": seccion == "Metodología y ayuda",
-        "acerca": seccion == "Acerca del visor",
+        "acerca": seccion == "Acerca del geoportal",
     }
     modo_actual = st.session_state.get("modo_analisis")
-    destino_plataforma = (
-        f"?seccion=mapa&amp;modo={html.escape(str(modo_actual))}"
-        if modo_actual
-        else "?seccion=inicio#seleccionar-analisis"
+    sufijo_modo = (
+        f"&amp;modo={html.escape(str(modo_actual))}" if modo_actual else ""
     )
 
     def actual(clave: str) -> str:
@@ -201,19 +208,20 @@ def mostrar_navegacion_portal(seccion: str) -> None:
         <a class="ref-skip" href="#stMain" target="_self">Saltar al contenido principal</a>
         <header class="ref-nav">
           <div class="ref-nav-in">
-            <div class="ref-util"><a href="?seccion=inicio" target="_self">Inicio</a><a href="?seccion=datos" target="_self">Atribución de datos</a><span>WGS 84 · EPSG:4326</span></div>
+            <div class="ref-util"><a href="?seccion=inicio" target="_self"{actual('inicio')}>Inicio</a><a href="?seccion=metodo" target="_self"{actual('metodo')}>Metodología y ayuda</a><a href="?seccion=acerca" target="_self"{actual('acerca')}>Acerca del geoportal</a><span>WGS 84 · EPSG:4326</span></div>
             <div class="ref-main-row">
               <a class="ref-wm" href="?seccion=inicio" target="_self" aria-label="Inicio · Conectividad Panamá">{LOGO_PORTAL}<span><b>Conectividad Panamá</b><small>Cuenca del Canal de Panamá</small></span></a>
               <nav class="ref-links" aria-label="Secciones">
-                <a href="?seccion=objetivo" target="_self"{actual('objetivo')}>Conoce la herramienta<i class="ref-chev"></i></a>
-                <a href="{destino_plataforma}" target="_self"{actual('mapa')}>Plataforma<i class="ref-chev"></i></a>
-                <a href="?seccion=datos" target="_self"{actual('datos')}>Uso de datos<i class="ref-chev"></i></a>
-                <a href="?seccion=acerca" target="_self"{actual('acerca')}>FAQ<i class="ref-chev"></i></a>
+                <a href="?seccion=explorar{sufijo_modo}" target="_self"{actual('explorar')}>Explorar</a>
+                <a href="?seccion=comparar{sufijo_modo}" target="_self"{actual('comparar')}>Comparar</a>
+                <a href="?seccion=analizar{sufijo_modo}" target="_self"{actual('analizar')}>Analizar</a>
+                <a href="?seccion=eri{sufijo_modo}" target="_self"{actual('eri')}>ERI</a>
+                <a href="?seccion=resultados{sufijo_modo}" target="_self"{actual('resultados')}>Resultados</a>
               </nav>
               <div class="ref-nav-btns">
-                <a class="ref-btn ref-btn-w" href="{destino_plataforma}" target="_self">Explorar datos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+                <a class="ref-btn ref-btn-w" href="?seccion=explorar{sufijo_modo}" target="_self">Explorar datos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
                 <details class="ref-lang"><summary class="ref-btn ref-btn-o" aria-label="Idioma: español">ES <i class="ref-chev"></i></summary><div class="ref-lang-menu"><button type="button" aria-checked="true">Español <span>✓</span></button><button type="button" disabled>English <span>pronto</span></button></div></details>
-                <details class="ref-mobile-menu"><summary class="ref-burger">Menú</summary><nav class="ref-mobile-links" aria-label="Secciones móviles"><a href="?seccion=objetivo" target="_self">Conoce la herramienta</a><a href="{destino_plataforma}" target="_self">Plataforma</a><a href="?seccion=datos" target="_self">Uso de datos</a><a href="?seccion=acerca" target="_self">FAQ</a></nav></details>
+                <details class="ref-mobile-menu"><summary class="ref-burger">Menú</summary><nav class="ref-mobile-links" aria-label="Secciones móviles"><a href="?seccion=inicio" target="_self">Inicio</a><a href="?seccion=explorar{sufijo_modo}" target="_self">Explorar</a><a href="?seccion=comparar{sufijo_modo}" target="_self">Comparar</a><a href="?seccion=analizar{sufijo_modo}" target="_self">Analizar</a><a href="?seccion=eri{sufijo_modo}" target="_self">ERI</a><a href="?seccion=resultados{sufijo_modo}" target="_self">Resultados</a><a href="?seccion=metodo" target="_self">Metodología y ayuda</a><a href="?seccion=acerca" target="_self">Acerca</a></nav></details>
               </div>
             </div>
           </div>
@@ -230,13 +238,13 @@ def mostrar_hero_inicio() -> None:
           <div class="ref-hero-in">
             <h1>Conectividad ecológica de la Cuenca del Canal de Panamá</h1>
             <p>Portal SIG para detectar dónde hay conectividad, dónde hay fragmentación, dónde se está perdiendo bosque y dónde conviene revisar. Integra JRC, Hansen, ESRI, GEDI y Sentinel en Google Earth Engine, los corredores de Almanaque Azul, el bosque 2021 de MiAMBIENTE y el Índice de Resiliencia Ecológica (ERI).</p>
-            <div class="ref-acts"><a class="ref-btn ref-btn-w" href="?seccion=inicio&amp;selector=1" target="_self">Realizar análisis</a><a class="ref-btn ref-btn-o" href="?seccion=metodo" target="_self">Conocer el método</a></div>
+            <div class="ref-acts"><a class="ref-btn ref-btn-w" href="?seccion=explorar" target="_self">Explorar el mapa</a><a class="ref-btn ref-btn-o" href="?seccion=inicio&amp;selector=1" target="_self">Realizar análisis</a></div>
           </div>
           <svg class="ref-hero-cut" viewBox="0 0 1440 150" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,150 1440,40 1440,150" fill="#fff"/><g fill="none" stroke="#fabc20" stroke-opacity=".7" stroke-width="1.3"><path d="M1150 150 C1210 112 1320 96 1440 92"/><path d="M1200 150 C1255 120 1340 108 1440 106"/><path d="M1250 150 C1300 128 1365 120 1440 119"/></g><polygon points="960,62.7 1440,26 1440,34 960,70.7" fill="#fff"/><polygon points="880,78.8 1440,36 1440,46 880,88.8" fill="#77cc09"/><polygon points="990,84.4 1440,50 1440,59 990,93.4" fill="#fabc20"/></svg>
         </section>
         <section class="ref-start">
           <div class="ref-meta"><div><span>Sistema de referencia</span><b>WGS 84 · EPSG:4326</b></div><div><span>Resolución</span><b>10 m · 30 m</b></div><div><span>Serie temporal</span><b>1990–2025</b></div><div><span>Área de estudio</span><b>Cuenca del Canal</b></div><div><span>Procesamiento</span><b>Google Earth Engine</b></div></div>
-          <div class="ref-intro"><h2>¿Qué desea preevaluar?</h2><p>Elija una lectura. Después podrá seleccionar una finca, una subcuenca, un polígono o la cuenca completa.</p></div>
+          <div class="ref-intro"><h2>Explore, compare y analice la CHCP</h2><p>Dibuje un polígono, seleccione una subcuenca o consulte la cuenca completa con las mismas reglas de recorte territorial.</p></div>
         </section>
         """,
         unsafe_allow_html=True,

@@ -8,8 +8,9 @@ persona empiece por su pregunta y vea únicamente los controles necesarios:
 3. **Preevaluación integral:** reúne las dos lecturas anteriores para orientar una visita,
    sin confundir el cambio territorial con el valor estratégico de los corredores.
 
-Después de elegir la ruta, el área puede ser una finca registrada, una subcuenca
-consultada directamente desde Earth Engine, un polígono dibujado o toda la cuenca.
+Después de elegir la ruta, el área pública puede ser un polígono dibujado, una
+subcuenca local o toda la cuenca. Las geometrías de cuenca y subcuencas viajan con
+la aplicación y no dependen de un asset vectorial privado de Earth Engine.
 
 La aplicación produce una **preevaluación indicativa**: ayuda a justificar por qué un
 área merece una revisión más detallada y dónde conviene mirar primero. No confirma
@@ -18,8 +19,9 @@ demuestra por sí sola conectividad funcional para una especie.
 
 ## Qué se añadió en este repositorio
 
-- Navegación principal simplificada entre **Mapa**, **Metodología y ayuda** y
-  **Acerca del visor**. Las páginas explicativas no inician Earth Engine.
+- Navegación V2 entre **Inicio**, **Explorar**, **Comparar**, **Analizar**, **ERI**,
+  **Resultados**, **Metodología y ayuda** y **Acerca del geoportal**. Las páginas
+  explicativas no inician Earth Engine.
 - Panel de fuentes inspirado en visores ambientales: JRC TMF, Hansen, ESRI, NDVI y
   GEDI conservan controles independientes, además de los bloques de corredores y
   bosque/conectividad.
@@ -38,8 +40,11 @@ demuestra por sí sola conectividad funcional para una especie.
 - Explicación diferenciada para dos niveles de lectura: recorrido breve y lenguaje
   cotidiano para personas no especialistas; fuentes, pesos, umbrales y limitaciones
   bajo demanda para usuarios geoespaciales.
-- Selección de subcuencas desde la colección configurada en Earth Engine, además de
-  fincas, polígonos dibujados y la cuenca completa.
+- Selección pública mediante polígonos editables, las 53 subcuencas locales o la
+  cuenca completa. El polígono que cruza la CHCP se recorta a su intersección válida.
+- Catálogo temporal en `geoportal_catalogo.py`, con años válidos por fuente y
+  rechazo explícito de períodos inexistentes. GEDI, bosque 2021 y ERI se identifican
+  como productos de referencia fija, no como falsas series anuales.
 - 22 polígonos de corredores y 14 puntos críticos publicados por Almanaque Azul.
 - Las categorías originales `alta`, `mediana` y `media-baja`, sin sustituirlas por una clasificación inventada.
 - Los tres tramos panameños identificados como Corredor Biológico Mesoamericano: oeste, San Lorenzo y este.
@@ -80,7 +85,7 @@ conectores, separaciones y componentes aislados.
 
 1. Si lo necesita, consulte **Metodología y ayuda** o **Acerca del visor** antes de conectarse a los datos.
 2. Elija **Preevaluación territorial**, **Corredores y conectividad** o **Preevaluación integral**.
-3. Seleccione una finca, una subcuenca, dibuje un polígono o use toda la cuenca configurada.
+3. Dibuje un polígono, seleccione una subcuenca o use toda la cuenca configurada.
 4. En **Mapa**, active únicamente las capas que necesita y pulse **Crear análisis**. La aplicación procesa solo las fuentes necesarias y muestra
    primero una conclusión breve, los indicadores principales y el mapa.
 5. En las opciones con conectividad, la aplicación conserva el área elegida para las hectáreas, pero revisa también un
@@ -105,7 +110,8 @@ conectores, separaciones y componentes aislados.
 
 - JRC Tropical Moist Forest 2025.
 - Hansen Global Forest Change 2025.
-- ESRI Land Use/Land Cover 2017-2024.
+- ESRI Land Use/Land Cover 2017-2025 para consulta visual; el índice conserva
+  el período metodológico validado 2017-2024.
 - GEDI / OpenForis para altura del dosel.
 - Sentinel-2 SR Harmonized para NDVI.
 - [Mapa de corredores naturales de Panamá](https://www.almanaqueazul.org/conectividad/mapa/), Fundación Almanaque Azul, versión mostrada `2024.05`.
@@ -126,21 +132,21 @@ streamlit run app.py
 
 ## Crear una nueva app en Streamlit Community Cloud
 
-El portal cartográfico con ERI indicativo se mantiene separado de la aplicación
-estable en la rama `version/5.0-portal-eri`. El ZIP aportado se utilizó únicamente
+El Geoportal CHCP 2.0 se mantiene separado de la aplicación estable en la rama
+`feature/geoportal-chcp-v2`. El ZIP aportado se utilizó únicamente
 como referencia de presentación; los cálculos y datos siguen siendo los de este
 repositorio. El ERI es complementario y no modifica la prioridad vigente. Para probar
 el modelo como una aplicación nueva sin modificar la actual:
 
 1. En Streamlit Community Cloud elija **Create app**.
 2. Use el repositorio `julii5sos/julii5sos-evaluacion-corredores-panama`.
-3. En **Branch** seleccione `version/5.0-portal-eri`.
+3. En **Branch** seleccione `feature/geoportal-chcp-v2`.
 4. En **Main file path** escriba `app.py`.
 5. Elija un nombre distinto, por ejemplo `visor-chcp-eri`.
-6. Copie en **App settings > Secrets** los mismos secretos de la aplicación estable y
-   verifique que la cuenta de servicio tenga acceso a los assets privados de fincas y
-   cobertura forestal. La cuenca y las subcuencas ya viajan dentro de la aplicación.
-7. Despliegue y pruebe primero las cuatro áreas disponibles, la subcuenca Lago
+6. Copie en **App settings > Secrets** los secretos de Earth Engine y verifique que la
+   cuenta de servicio tenga acceso al asset institucional de cobertura forestal. La
+   cuenca y las subcuencas ya viajan dentro de la aplicación.
+7. Despliegue y pruebe primero un polígono, la subcuenca Lago
    Miraflores, un polígono recortado y cada una de las tres rutas de preevaluación.
 
 La aplicación estable continúa apuntando a `main`; publicar esta rama como una app
@@ -152,9 +158,7 @@ Guarde los secretos únicamente en `.streamlit/secrets.toml` para desarrollo loc
 
 ```toml
 EE_PROJECT = "proyecto-de-earth-engine"
-EE_ASSET_FINCAS = "projects/PROYECTO/assets/COLECCION_PRIVADA_DE_FINCAS"
 EE_ASSET_BOSQUE_2021 = "projects/ee-julissaguevaravega/assets/CBOTB_2021_25k"
-FINCAS_ACCESS_CODE = "CODIGO_PRIVADO_DE_AL_MENOS_8_CARACTERES"
 
 EE_SERVICE_ACCOUNT_JSON = '''
 {
@@ -182,8 +186,11 @@ Desde ese momento, cada área seleccionada usa la misma fuente: la aplicación f
 
 ## Estructura principal
 
-- `app_experiencia.py`: interfaz, motor Earth Engine e informe.
+- `app_experiencia.py`: interfaz cartográfica, motor Earth Engine e informe.
 - `portal_html.py`: encabezado, portada y composición visual copiados del HTML de referencia.
+- `geoportal_catalogo.py`: disponibilidad, versión y reglas temporales de las fuentes.
+- `geoportal_componentes.py`: panel, mapa y controles territoriales reutilizables para el
+  estado local sin Earth Engine; mantiene el mapa útil y evita resultados simulados.
 - `territorio_local.py`: carga de la cuenca y las 53 subcuencas desde GeoJSON locales.
 - `corredores.py`: capas de Almanaque Azul e intersección con el área evaluada.
 - `bosque_conectividad.py`: preparación del recorte institucional, fragmentación y red de parches.
@@ -192,6 +199,8 @@ Desde ese momento, cada área seleccionada usa la misma fuente: la aplicación f
 - `data/territorio/`: cuenca y subcuencas incluidas en el portal, sin depender de un asset de Earth Engine.
 - `data/`: GeoJSON preparados, catálogo y originales públicos.
 - `METODOLOGIA.md`: fórmulas, separaciones metodológicas y limitaciones.
+- `docs/COMPARACION_VISUAL_GEOPORTAL_CHCP_V2.md`: contraste verificable con el HTML,
+  capturas locales, desviaciones deliberadas y alcance real de la comparación temporal.
 
 ## Pruebas
 

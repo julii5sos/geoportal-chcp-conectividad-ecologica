@@ -6,13 +6,14 @@ from pathlib import Path
 import streamlit as st
 
 from eri_indicativo import PESOS_ERI
+from geoportal_catalogo import filas_catalogo
 from metodologia_indice import (
     PERIODOS_ANALISIS,
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
     UMBRALES_INDICE,
 )
-from modos_app import MODO_INTEGRAL, MODOS_ANALISIS
+from modos_app import MODO_INTEGRAL, MODO_TERRITORIAL, MODOS_ANALISIS
 from portal_html import (
     inyectar_estilo_portal,
     mostrar_acceso_selector,
@@ -29,15 +30,21 @@ st.set_page_config(
 )
 st.session_state["_pagina_configurada"] = True
 
-SECCION_MAPA = "Mapa"
-SECCION_OBJETIVO = "Conoce la herramienta"
-SECCION_DATOS = "Uso de datos"
+SECCION_INICIO = "Inicio"
+SECCION_EXPLORAR = "Explorar"
+SECCION_COMPARAR = "Comparar"
+SECCION_ANALIZAR = "Analizar"
+SECCION_ERI = "ERI"
+SECCION_RESULTADOS = "Resultados"
 SECCION_METODO = "Metodología y ayuda"
-SECCION_ACERCA = "Acerca del visor"
+SECCION_ACERCA = "Acerca del geoportal"
 SECCIONES_PRINCIPALES = (
-    SECCION_MAPA,
-    SECCION_OBJETIVO,
-    SECCION_DATOS,
+    SECCION_INICIO,
+    SECCION_EXPLORAR,
+    SECCION_COMPARAR,
+    SECCION_ANALIZAR,
+    SECCION_ERI,
+    SECCION_RESULTADOS,
     SECCION_METODO,
     SECCION_ACERCA,
 )
@@ -152,17 +159,18 @@ st.markdown(
 inyectar_estilo_portal()
 
 
-def mostrar_cabecera_portal(seccion=SECCION_MAPA):
+def mostrar_cabecera_portal(seccion=SECCION_INICIO):
     mostrar_navegacion_portal(seccion)
 
 
 def elegir_modo(modo):
     st.session_state["modo_analisis"] = modo
     st.session_state["selector_modo_sidebar"] = modo
-    st.session_state["seccion_tablero"] = SECCION_MAPA
+    st.session_state["seccion_tablero"] = SECCION_ANALIZAR
+    st.session_state["vista_geoportal"] = "analizar"
     st.session_state["mostrar_resultados"] = False
     st.query_params.clear()
-    st.query_params["seccion"] = "mapa"
+    st.query_params["seccion"] = "analizar"
     st.query_params["modo"] = modo
 
 
@@ -172,7 +180,7 @@ def abrir_selector_analisis():
     st.session_state.pop("modo_analisis", None)
     st.session_state.pop("selector_modo_sidebar", None)
     st.session_state["mostrar_resultados"] = False
-    st.session_state["seccion_tablero"] = SECCION_MAPA
+    st.session_state["seccion_tablero"] = SECCION_INICIO
     st.query_params.clear()
     st.query_params["seccion"] = "inicio"
 
@@ -237,13 +245,16 @@ def mostrar_selector_dialogo():
 def abrir_vista(vista):
     st.session_state["seccion_tablero"] = vista
     st.query_params["seccion"] = {
-        SECCION_MAPA: "mapa",
-        SECCION_OBJETIVO: "objetivo",
-        SECCION_DATOS: "datos",
+        SECCION_INICIO: "inicio",
+        SECCION_EXPLORAR: "explorar",
+        SECCION_COMPARAR: "comparar",
+        SECCION_ANALIZAR: "analizar",
+        SECCION_ERI: "eri",
+        SECCION_RESULTADOS: "resultados",
         SECCION_METODO: "metodo",
         SECCION_ACERCA: "acerca",
-    }.get(vista, "mapa")
-    if vista == SECCION_MAPA:
+    }.get(vista, "inicio")
+    if vista in (SECCION_EXPLORAR, SECCION_COMPARAR, SECCION_ANALIZAR, SECCION_ERI):
         st.session_state["mostrar_resultados"] = False
 
 
@@ -274,7 +285,7 @@ def mostrar_objetivo():
     st.markdown(
         """
         <div class="ruta-simple" aria-label="Cómo ayuda la preevaluación">
-          <div class="ruta-paso"><span class="ruta-numero">1</span><b>Seleccione el área</b><span>Use una finca, una subcuenca, un polígono dibujado o la cuenca completa.</span></div>
+          <div class="ruta-paso"><span class="ruta-numero">1</span><b>Seleccione el área</b><span>Dibuje un polígono, elija una subcuenca o consulte la cuenca completa.</span></div>
           <div class="ruta-paso"><span class="ruta-numero">2</span><b>Reúna indicios</b><span>La aplicación consulta señales satelitales, corredores publicados y estructura del bosque según el enfoque elegido.</span></div>
           <div class="ruta-paso"><span class="ruta-numero">3</span><b>Sustente el siguiente paso</b><span>Reciba una orientación, un mapa y evidencia trazable para decidir si conviene profundizar o visitar el área.</span></div>
         </div>
@@ -452,6 +463,13 @@ def mostrar_metodo():
             """
         )
 
+    st.markdown("## Catálogo temporal y trazabilidad")
+    st.caption(
+        "El portal no sustituye silenciosamente un año inexistente. Los productos de "
+        "referencia fija se identifican como no comparables."
+    )
+    st.dataframe(filas_catalogo(), hide_index=True, width="stretch")
+
     st.button(
         "Elegir análisis",
         type="primary",
@@ -528,7 +546,7 @@ def mostrar_acerca():
           <section class="alcance-card">
             <h3>Para personas usuarias</h3>
             <ul>
-              <li>seleccionar una finca, subcuenca, polígono o la cuenca completa;</li>
+              <li>dibujar un polígono, seleccionar una subcuenca o consultar la cuenca completa;</li>
               <li>consultar capas sin necesitar experiencia previa en teledetección;</li>
               <li>obtener una lectura resumida y evidencia descargable;</li>
               <li>reconocer qué información debe confirmarse con campo o documentos.</li>
@@ -563,8 +581,21 @@ def mostrar_acerca():
     )
 
 
-if st.session_state.get("seccion_tablero") == "Análisis":
-    st.session_state["seccion_tablero"] = SECCION_MAPA
+def mostrar_resultados_vacios():
+    mostrar_cabecera(
+        "Resultados",
+        "Los resultados siempre corresponden a la ejecución activa.",
+        "Todavía no existe una ejecución en esta sesión. Seleccione un área y ejecute "
+        "una preevaluación para habilitar indicadores, mapas, tablas y descargas.",
+        "No se muestran valores de demostración ni resultados ajenos al área seleccionada",
+    )
+    st.button(
+        "Ir a Analizar",
+        type="primary",
+        width="stretch",
+        on_click=abrir_selector_analisis,
+    )
+
 
 seccion_consulta = str(st.query_params.get("seccion", "")).strip().lower()
 modo_consulta = str(st.query_params.get("modo", "")).strip().lower()
@@ -575,44 +606,61 @@ if (
 ):
     st.session_state["modo_analisis"] = modo_consulta
     st.session_state["selector_modo_sidebar"] = modo_consulta
-    st.session_state["seccion_tablero"] = SECCION_MAPA
     st.session_state["mostrar_resultados"] = False
-if seccion_consulta == "inicio":
-    st.session_state.pop("modo_analisis", None)
-    st.session_state.pop("selector_modo_sidebar", None)
-    st.session_state["seccion_tablero"] = SECCION_MAPA
-elif seccion_consulta in {"mapa", "plataforma"}:
-    st.session_state["seccion_tablero"] = SECCION_MAPA
-elif seccion_consulta == "objetivo":
-    st.session_state["seccion_tablero"] = SECCION_OBJETIVO
-elif seccion_consulta == "datos":
-    st.session_state["seccion_tablero"] = SECCION_DATOS
+
+if not seccion_consulta:
+    seccion_consulta = "inicio"
+
+if seccion_consulta in {"inicio", "objetivo", "datos"}:
+    st.session_state["seccion_tablero"] = SECCION_INICIO
+    st.session_state["vista_geoportal"] = "inicio"
+elif seccion_consulta in {"mapa", "plataforma", "explorar"}:
+    st.session_state["seccion_tablero"] = SECCION_EXPLORAR
+    st.session_state["vista_geoportal"] = "explorar"
+    st.session_state["mostrar_resultados"] = False
+elif seccion_consulta == "comparar":
+    st.session_state["seccion_tablero"] = SECCION_COMPARAR
+    st.session_state["vista_geoportal"] = "comparar"
+    st.session_state["mostrar_resultados"] = False
+    st.session_state["modo_analisis"] = MODO_TERRITORIAL
+    st.session_state["selector_modo_sidebar"] = MODO_TERRITORIAL
+elif seccion_consulta == "analizar":
+    st.session_state["seccion_tablero"] = SECCION_ANALIZAR
+    st.session_state["vista_geoportal"] = "analizar"
+    st.session_state["mostrar_resultados"] = False
+elif seccion_consulta == "eri":
+    st.session_state["seccion_tablero"] = SECCION_ERI
+    st.session_state["vista_geoportal"] = "eri"
+    st.session_state["mostrar_resultados"] = False
+    st.session_state["modo_analisis"] = MODO_INTEGRAL
+    st.session_state["selector_modo_sidebar"] = MODO_INTEGRAL
+    st.session_state[f"capa_eri_{MODO_INTEGRAL}"] = True
+elif seccion_consulta == "resultados":
+    st.session_state["seccion_tablero"] = SECCION_RESULTADOS
+    st.session_state["vista_geoportal"] = "resultados"
+    st.session_state["mostrar_resultados"] = True
 elif seccion_consulta == "metodo":
     st.session_state["seccion_tablero"] = SECCION_METODO
 elif seccion_consulta in {"acerca", "faq"}:
     st.session_state["seccion_tablero"] = SECCION_ACERCA
 
-seccion_tablero = st.session_state.get("seccion_tablero", SECCION_MAPA)
+seccion_tablero = st.session_state.get("seccion_tablero", SECCION_INICIO)
 if seccion_tablero not in SECCIONES_PRINCIPALES:
-    seccion_tablero = SECCION_MAPA
+    seccion_tablero = SECCION_INICIO
     st.session_state["seccion_tablero"] = seccion_tablero
 
 mostrar_cabecera_portal(seccion_tablero)
 
 seccion_anterior = st.session_state.get("_seccion_publica_anterior")
-if (
-    seccion_tablero == SECCION_MAPA
-    and seccion_anterior
-    in (SECCION_OBJETIVO, SECCION_DATOS, SECCION_METODO, SECCION_ACERCA)
-):
+if seccion_tablero in (SECCION_EXPLORAR, SECCION_COMPARAR, SECCION_ANALIZAR, SECCION_ERI):
     st.session_state["mostrar_resultados"] = False
 st.session_state["_seccion_publica_anterior"] = seccion_tablero
 
-if seccion_tablero == SECCION_OBJETIVO:
-    mostrar_objetivo()
-    st.stop()
-if seccion_tablero == SECCION_DATOS:
-    mostrar_datos()
+if seccion_tablero == SECCION_INICIO:
+    mostrar_hero_inicio()
+    mostrar_acceso_selector()
+    if selector_consulta in {"1", "true", "si", "sí"}:
+        mostrar_selector_dialogo()
     st.stop()
 if seccion_tablero == SECCION_METODO:
     mostrar_metodo()
@@ -627,11 +675,31 @@ if modo_analisis not in MODOS_ANALISIS:
     st.session_state.pop("modo_analisis", None)
     modo_analisis = None
 
+if seccion_tablero == SECCION_RESULTADOS and "resultados_analisis" not in st.session_state:
+    mostrar_resultados_vacios()
+    st.stop()
+
+if seccion_tablero in (SECCION_EXPLORAR, SECCION_COMPARAR) and modo_analisis is None:
+    modo_analisis = MODO_TERRITORIAL
+    st.session_state["modo_analisis"] = modo_analisis
+    st.session_state["selector_modo_sidebar"] = modo_analisis
+
+if seccion_tablero == SECCION_ERI and modo_analisis is None:
+    modo_analisis = MODO_INTEGRAL
+    st.session_state["modo_analisis"] = modo_analisis
+    st.session_state["selector_modo_sidebar"] = modo_analisis
+    st.session_state[f"capa_eri_{modo_analisis}"] = True
+
+if seccion_tablero == SECCION_RESULTADOS and modo_analisis is None:
+    modo_analisis = st.session_state.get("resultados_analisis", {}).get(
+        "modo_analisis", MODO_INTEGRAL
+    )
+    st.session_state["modo_analisis"] = modo_analisis
+    st.session_state["selector_modo_sidebar"] = modo_analisis
+
 if modo_analisis is None:
-    mostrar_hero_inicio()
     mostrar_acceso_selector()
-    if selector_consulta in {"1", "true", "si", "sí"}:
-        mostrar_selector_dialogo()
+    mostrar_selector_dialogo()
     st.stop()
 
 

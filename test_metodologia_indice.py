@@ -64,6 +64,7 @@ class IndicePrioridadTest(unittest.TestCase):
         self.assertEqual(PERIODOS_ANALISIS["hansen_diagnostico"], 2025)
         self.assertEqual(PERIODOS_ANALISIS["esri_inicial"], 2017)
         self.assertEqual(PERIODOS_ANALISIS["esri_final"], 2024)
+        self.assertEqual(PERIODOS_ANALISIS["esri_final_visual"], 2025)
         self.assertEqual(PERIODOS_ANALISIS["ndvi_inicial"], 2020)
         self.assertEqual(PERIODOS_ANALISIS["ndvi_final"], 2025)
         self.assertEqual(PERIODOS_ANALISIS["ndvi_final_visual"], 2025)
