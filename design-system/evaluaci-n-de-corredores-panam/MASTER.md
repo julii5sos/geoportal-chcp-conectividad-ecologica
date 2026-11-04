@@ -7,8 +7,8 @@ Este archivo adapta las recomendaciones de UI/UX al sistema institucional ya est
 - Interfaz científica de tipo tablero cartográfico, con divulgación progresiva.
 - Navegación principal persistente: Mapa, Metodología y ayuda, y Acerca del visor.
   Los resultados no ocupan una pestaña global: se abren únicamente después de ejecutar.
-- Una vez elegido el análisis, la pantalla se organiza como visor: controles del área y
-  capas a la izquierda, mapa como elemento dominante y lectura rápida a la derecha.
+- Una vez elegido el análisis, la pantalla se organiza como el HTML de referencia:
+  controles a la izquierda, mapa en el centro y resultados a la derecha después de ejecutar.
 - La explicación inicial desaparece durante el trabajo para no competir con el mapa.
 - La ruta principal prioriza acción y decisión: configurar el área, ejecutar, leer la
   conclusión y revisar el mapa. La explicación técnica aparece únicamente cuando se solicita.
@@ -22,16 +22,17 @@ Este archivo adapta las recomendaciones de UI/UX al sistema institucional ya est
 
 | Rol | Valor |
 |---|---|
-| Verde principal | `#00544d` |
-| Verde oscuro | `#00403a` |
-| Acento | `#76b72a` |
-| Fondo claro | `#f6faf8` |
+| Azul principal | `#0a4393` |
+| Azul oscuro | `#062a5e` |
+| Acento verde | `#77cc09` |
+| Acento amarillo | `#fabc20` |
+| Fondo claro | `#f6f8fb` |
 | Superficie | `#ffffff` |
-| Texto principal | `#00544d` |
-| Texto secundario | `#356b61` |
-| Borde | `#b6d1c8` |
-| Error / alta atención | `#b42318` |
-| Atención media | `#f79009` |
+| Texto principal | `#1b2433` |
+| Texto secundario | `#566176` |
+| Borde | `#e1e6ee` |
+| Error / alta atención | `#d0442c` |
+| Atención media | `#fabc20` |
 
 ### Paleta de datos
 
@@ -52,7 +53,7 @@ Los colores originales de Almanaque Azul (`#345a01`, `#a1d303`, `#e0c504`) solo 
 
 ## Tipografía y densidad
 
-- Se conserva la tipografía nativa y accesible de Streamlit para evitar descargas externas y saltos de diseño.
+- Se usa DM Sans, igual que el HTML entregado, con alternativas de sistema.
 - Texto base mínimo de 16 px en controles y lectura principal.
 - Interlineado de 1.5 o mayor en textos explicativos.
 - Escala de espacio: 4, 8, 16, 24, 32, 48 y 64 px.
@@ -60,26 +61,28 @@ Los colores originales de Almanaque Azul (`#345a01`, `#a1d303`, `#e0c504`) solo 
 
 ## Componentes
 
-- Barra superior compacta: identifica la cuenca, el tipo de preevaluación y su carácter
-  indicativo sin repetir una portada extensa.
+- Encabezado institucional de dos niveles: utilidades, marca, navegación y acciones,
+  con altura de 118 px y el mismo logotipo del HTML.
 - Panel de fuentes: cada producto ocupa un bloque reconocible —JRC TMF, Hansen, ESRI,
   Sentinel-2/NDVI y GEDI— con sus capas y períodos propios. Corredores y bosque 2021
   permanecen en bloques separados.
+- Panel de trabajo: tres pestañas de igual jerarquía —Capas, Polígono y Mapa base—
+  separan visualización, selección territorial y fondo cartográfico. Las acciones se
+  mantienen visibles al pie del panel sin mezclarse con las capas.
 - Acción Crear análisis: botón primario al final del panel lateral; distingue los
   controles que solo cambian la visualización de la acción que ejecuta los cálculos.
-- Tablero principal: mapa ancho acompañado por una columna de resultado con la unidad,
-  superficie, conclusión y cuatro indicadores clave.
-- Resultados inmediatos: el mapa permanece visible y la columna derecha alterna entre
+- Tablero principal: panel de 340 px, mapa flexible y panel lateral de resultados.
+- Resultados inmediatos: el mapa permanece visible y el bloque derecho alterna entre
   lectura rápida y gráficas compactas. Las gráficas principales se forman con el
   resultado ya calculado, usan barras a color con valores directos y ofrecen una tabla
   de valores como alternativa accesible.
 - Resultados contextuales extensos: pestañas temáticas, descargas y una gráfica por
-  fuente solicitada bajo demanda. Se abren con «Detalle y descargas», ofrecen «Volver
+  fuente solicitada bajo demanda. Se abren con «Resultados y descargas», ofrecen «Volver
   al mapa» y no vuelven a construir el mapa.
 - Resultados completos: pestañas visibles por tema —resumen, cambios territoriales,
   corredores y bosque/conectividad—; no se eliminan datos ni se esconden tras casillas.
-- Botón primario: fondo `#00544d`, texto blanco y foco de 3 px.
-- Botón secundario: superficie blanca, borde `#00544d` y texto del mismo color.
+- Botón primario: fondo `#0a4393`, texto blanco y foco verde visible.
+- Botón secundario: superficie blanca, borde `#0a4393` y texto del mismo color.
 - Resultados: métricas en cuadrícula adaptable; tablas con encabezados explícitos.
 - Resumen ejecutivo: una conclusión de prioridad y cuatro indicadores clave antes del mapa.
 - Mapas: grupos independientes para capas temáticas, corredores externos, parches calculados y referencias.
@@ -96,11 +99,13 @@ Los colores originales de Almanaque Azul (`#345a01`, `#a1d303`, `#e0c504`) solo 
 ## Reglas de interacción
 
 - La cobertura institucional se configura una sola vez mediante un asset privado; la interfaz pública no solicita shapefiles.
-- Antes de ejecutar solo se muestran área, superficie y vista; períodos, fuentes y entregables permanecen en un desplegable cerrado.
+- Antes de ejecutar se muestran el área, las capas y el mapa; períodos, fuentes y entregables permanecen en desplegables cerrados.
 - Después de ejecutar, los bloques completos de cambios, corredores y conectividad se activan por separado y comienzan cerrados.
 - Ninguna métrica, gráfico, tabla o descarga se elimina para reducir la densidad visual; solo cambia el momento en que se presenta.
 - Los controles del mapa permanecen en el panel lateral y los resultados se consultan por
   pestañas, siguiendo el patrón de los visores ambientales profesionales.
+- Capas es la pestaña inicial; Polígono reúne el área, los años y los parámetros técnicos;
+  Mapa base cambia únicamente el contexto visual y nunca la metodología.
 - Al cerrar el panel lateral, el tablero entra en modo de enfoque: mapa y resultados
   ocupan todo el ancho, mientras el control nativo para reabrir el panel permanece visible.
 - Las gráficas de JRC, Hansen, ESRI y NDVI conservan su propia unidad y significado; no
@@ -113,8 +118,8 @@ Los colores originales de Almanaque Azul (`#345a01`, `#a1d303`, `#e0c504`) solo 
   funciona únicamente como control de rango y no sustituye la lectura principal de barras.
 - Las series se calculan una por vez, se almacenan temporalmente en caché y nunca bloquean
   la carga inicial del mapa o del resultado principal.
-- Nunca se muestra una sección de resultados vacía antes de ejecutar. Al finalizar el
-  cálculo, la aplicación abre el resultado automáticamente.
+- Antes de ejecutar no se reserva una columna permanente para resultados vacíos. Al
+  finalizar, la lectura rápida se abre a la derecha como en el HTML.
 - La conectividad se presenta con parches, estructura esencial, ruta potencial al corredor y separaciones en capas independientes.
 - La lectura principal usa «fragmentos cercanos o separados»; nodo, arista, componente y densidad quedan reservados para el detalle técnico opcional.
 - Los fragmentos se muestran por defecto. La red completa nunca se dibuja: la capa técnica usa el árbol mínimo de cada grupo, con trazo verde oscuro y halo blanco.
@@ -142,3 +147,19 @@ Los colores originales de Almanaque Azul (`#345a01`, `#a1d303`, `#e0c504`) solo 
 - [x] Separar fragmentación y conectividad en dos mapas impresos sin fondo satelital.
 - [x] Mantener las leyendas fuera de los mapas en la ficha PDF.
 - [x] Desglosar el puntaje y diferenciarlo de la coincidencia espacial.
+
+## Fuente visual obligatoria 5.3
+
+- El diseño del paquete `conectividad_canal.zip` reemplaza las recomendaciones visuales
+  anteriores: no se reinterpretan sus colores, proporciones ni jerarquía.
+- Encabezado fijo de 118 px, azul `#0a4393`, con utilidades superiores, marca a la
+  izquierda, navegación institucional y acciones tipo píldora.
+- La plataforma usa exactamente la composición de tres zonas del HTML: panel lateral de
+  340 px, mapa flexible y panel de resultados de aproximadamente 400 px cuando existe
+  una preevaluación calculada.
+- Las pestañas son **Capas**, **Polígono** y **Mapa base**. El área, los años y los
+  parámetros técnicos pertenecen a Polígono; el botón principal permanece fijo al pie.
+- El mapa ocupa el espacio central desde el inicio. El panel de resultados permanece
+  cerrado hasta ejecutar y se abre a la derecha sin desplazar el contenido hacia abajo.
+- Cuenca y subcuencas se sirven desde `data/territorio/`; no deben volver a enlazarse a
+  un asset privado de Earth Engine.

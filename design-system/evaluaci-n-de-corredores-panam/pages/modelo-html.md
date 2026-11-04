@@ -140,3 +140,49 @@ ESRI, GEDI, NDVI y Almanaque Azul conservan su significado.
   leyenda y tabla accesible para no depender únicamente del color.
 - La capa ERI se activa bajo demanda desde el panel lateral para evitar sobrecargar la
   vista inicial y se acompaña de retroalimentación durante su cálculo.
+
+## Visor mapa primero 5.1
+
+- La evidencia cartográfica ocupa el ancho completo disponible y una altura mínima de
+  780 px en escritorio; el mapa es la primera superficie de trabajo después del contexto.
+- Se elimina la columna derecha permanente. La lectura, el ERI y la gráfica aparecen en
+  pestañas debajo del mapa únicamente cuando existe un resultado calculado.
+- El selector de unidad territorial sustituye cuatro opciones de radio por un solo
+  control compacto, sin modificar los tipos de área ni la regla de recorte a la CHCP.
+- El flujo principal conserva dos acciones, siguiendo el portal de referencia:
+  «Crear/Actualizar análisis» y «Resultados y descargas». «Cambiar enfoque» permanece
+  como acción secundaria en el panel lateral.
+- Se eliminan los accesos duplicados al detalle y la explicación «Acerca de esta vista»;
+  el contenido metodológico continúa disponible en la navegación superior.
+- Cuando el panel lateral se cierra, el mapa aprovecha inmediatamente todo el ancho y el
+  control nativo de Streamlit permite volver a abrirlo.
+
+## Panel de la plataforma HTML 5.2
+
+- El panel lateral adopta los 340 px del HTML de referencia y se divide en tres pestañas
+  funcionales: **Capas**, **Filtros** y **Mapa base**.
+- Capas reúne las fuentes cartográficas y sus interruptores; Filtros contiene la unidad
+  territorial, los períodos del comparador y las opciones técnicas; Mapa base permite
+  elegir imagen satelital, mapa claro u OpenStreetMap.
+- Las acciones se fijan al borde inferior del panel. Antes de calcular se muestra una
+  sola acción primaria; después se añaden Actualizar y Resultados en una fila compacta.
+- El fondo cartográfico forma parte de la firma visual y fuerza la actualización del mapa,
+  pero no invalida ni vuelve a ejecutar el resultado analítico.
+- En pantallas estrechas las pestañas conservan un área de interacción de 48 px y el panel
+  vuelve al ancho adaptable definido para móviles.
+
+## Paridad directa con el HTML 5.3
+
+- `portal_html.py` reproduce el encabezado, logotipo, navegación, botones, portada,
+  metadatos, tipografía DM Sans y corte diagonal del HTML entregado.
+- La vista cartográfica conserva las medidas del original: navegación de 118 px, panel
+  de capas de 340 px, mapa central y resultados laterales visibles solo después de
+  ejecutar la preevaluación.
+- Los grupos de fuentes continúan siendo controles Streamlit para conservar el análisis
+  vigente, pero adoptan el fondo, radio, tipografía y espaciado de `.lg`, `.ly` y
+  `.side-tabs` del portal.
+- La referencia visual del HTML prevalece sobre cualquier sistema generado previamente.
+  La validación UX se limita a foco visible, contraste, áreas táctiles, reducción de
+  movimiento y respuesta móvil; no modifica el diseño elegido.
+- El grupo Límites usa los GeoJSON incluidos en el paquete: cuenca activa por defecto y
+  subcuencas opcionales, sin consultas a assets vectoriales privados.

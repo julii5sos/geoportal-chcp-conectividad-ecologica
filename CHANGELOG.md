@@ -4,6 +4,46 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
+## [5.3.0] - 2026-11-01 — diseño exacto del portal y límites locales
+
+- Sustituye la interpretación visual anterior por la composición del HTML entregado:
+  encabezado azul de dos niveles, marca Conectividad Panamá, navegación institucional,
+  portada con corte diagonal, panel de 340 px, mapa central y resultados laterales.
+- Cambia las pestañas del panel a **Capas**, **Polígono** y **Mapa base**, con la acción
+  principal fija al pie como en la plataforma de referencia.
+- Incorpora `area_estudio.geojson` y `subcuencas_canal.geojson` del portal; la cuenca y
+  las 53 subcuencas ya no dependen de assets privados de Earth Engine.
+- Añade el grupo **Límites** para encender la cuenca y las subcuencas locales, con
+  identificación por nombre, grupo y superficie.
+- Mantiene el ERI indicativo, los análisis satelitales, corredores, fragmentación,
+  gráficas, informes y descargas existentes.
+
+## [5.2.0] - 2026-11-01 — panel de la plataforma HTML
+
+- Adapta la estructura funcional del portal HTML al panel lateral de Streamlit con
+  pestañas reales para **Capas**, **Filtros** y **Mapa base**.
+- Organiza las fuentes JRC, Hansen, ESRI, NDVI, GEDI, ERI y conectividad dentro de
+  Capas; mueve el área, los años y los parámetros técnicos a Filtros.
+- Añade tres fondos intercambiables —imagen satelital, mapa claro y OpenStreetMap— sin
+  alterar las geometrías, métricas ni reglas de la preevaluación.
+- Mantiene las acciones principales fijadas al pie del panel: **Realizar/Actualizar** y,
+  cuando existe un resultado, **Resultados**.
+- Ajusta el panel a 340 px, igual que el modelo HTML, y conserva el modo de enfoque al
+  cerrarlo para que el mapa recupere todo el ancho.
+
+## [5.1.0] - 2026-10-29 — visor centrado en el mapa
+
+- El mapa pasa a ocupar todo el ancho disponible y 780 px de alto en escritorio; la
+  lectura rápida, el ERI y la gráfica se presentan debajo cuando existe un resultado.
+- Sustituye las cuatro opciones de radio del área por un selector compacto que conserva
+  exactamente las mismas unidades territoriales y reglas de recorte.
+- Reduce las acciones principales a «Crear/Actualizar análisis» y «Resultados y
+  descargas», con «Cambiar enfoque» como acción secundaria.
+- Elimina la columna derecha permanente, los accesos duplicados al detalle y la
+  explicación redundante de la vista cartográfica.
+- Convierte la navegación superior en pestañas visuales ligeras, sin apariencia de
+  botones grandes, y conserva foco visible y controles de al menos 44 px.
+
 ## [5.0.0] - 2026-10-29 — portal cartográfico con ERI indicativo
 
 - Incorpora el Índice de Resiliencia Ecológica (ERI) como lectura complementaria entre

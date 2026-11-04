@@ -16,3 +16,15 @@ El raster continuo de conectividad de 6 km no se redistribuye en este repositori
 ## Cobertura bosque/no bosque
 
 La cobertura utilizada corresponde a la capa **Bosque y otros usos**, referencia 2021, publicada por SINIA–MiAMBIENTE. El repositorio no incluye el shapefile nacional `CBOTB_2021_25k`: la administración lo publica una sola vez como asset privado de Earth Engine. La aplicación selecciona automáticamente `Categoria = Bosques y Otras Tierras Boscosas` y recorta esos polígonos al área evaluada.
+
+## Cuenca y subcuencas del Canal de Panamá
+
+Los archivos `data/territorio/area_estudio.geojson` y
+`data/territorio/subcuencas_canal.geojson` proceden del paquete del portal
+**Conectividad Panamá** entregado para esta aplicación. Incluyen el límite de la Cuenca
+del Canal y 53 unidades territoriales. Se sirven directamente con la aplicación y se
+envían como geometrías a Earth Engine; no requieren un asset vectorial privado.
+
+El archivo de subcuencas recibido contenía algunos caracteres sustituidos en los
+atributos. `territorio_local.py` corrige únicamente los nombres visibles; no altera las
+geometrías ni las superficies de la fuente.

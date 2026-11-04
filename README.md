@@ -138,7 +138,8 @@ el modelo como una aplicación nueva sin modificar la actual:
 4. En **Main file path** escriba `app.py`.
 5. Elija un nombre distinto, por ejemplo `visor-chcp-eri`.
 6. Copie en **App settings > Secrets** los mismos secretos de la aplicación estable y
-   verifique que la cuenta de servicio tenga acceso a los assets privados.
+   verifique que la cuenta de servicio tenga acceso a los assets privados de fincas y
+   cobertura forestal. La cuenca y las subcuencas ya viajan dentro de la aplicación.
 7. Despliegue y pruebe primero las cuatro áreas disponibles, la subcuenca Lago
    Miraflores, un polígono recortado y cada una de las tres rutas de preevaluación.
 
@@ -152,7 +153,6 @@ Guarde los secretos únicamente en `.streamlit/secrets.toml` para desarrollo loc
 ```toml
 EE_PROJECT = "proyecto-de-earth-engine"
 EE_ASSET_FINCAS = "projects/PROYECTO/assets/COLECCION_PRIVADA_DE_FINCAS"
-EE_ASSET_SubCuencas = "projects/PROYECTO/assets/COLECCION_DE_SUBCUENCAS"
 EE_ASSET_BOSQUE_2021 = "projects/ee-julissaguevaravega/assets/CBOTB_2021_25k"
 FINCAS_ACCESS_CODE = "CODIGO_PRIVADO_DE_AL_MENOS_8_CARACTERES"
 
@@ -183,10 +183,13 @@ Desde ese momento, cada área seleccionada usa la misma fuente: la aplicación f
 ## Estructura principal
 
 - `app_experiencia.py`: interfaz, motor Earth Engine e informe.
+- `portal_html.py`: encabezado, portada y composición visual copiados del HTML de referencia.
+- `territorio_local.py`: carga de la cuenca y las 53 subcuencas desde GeoJSON locales.
 - `corredores.py`: capas de Almanaque Azul e intersección con el área evaluada.
 - `bosque_conectividad.py`: preparación del recorte institucional, fragmentación y red de parches.
 - `metodologia_indice.py`: reglas del índice satelital original.
 - `scripts/preparar_datos_corredores.py`: conversión reproducible EPSG:3857 → EPSG:4326.
+- `data/territorio/`: cuenca y subcuencas incluidas en el portal, sin depender de un asset de Earth Engine.
 - `data/`: GeoJSON preparados, catálogo y originales públicos.
 - `METODOLOGIA.md`: fórmulas, separaciones metodológicas y limitaciones.
 

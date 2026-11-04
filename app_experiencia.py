@@ -91,6 +91,17 @@ from modos_app import (
     area_debe_recortarse_a_cuenca,
 )
 from reporte_cartografico import crear_mapa_conectividad, crear_mapa_fragmentacion
+from portal_html import inyectar_estilo_portal
+from territorio_local import (
+    FUENTE_CUENCA,
+    FUENTE_SUBCUENCAS,
+    coleccion_cuenca,
+    coleccion_subcuencas,
+    geometria_cuenca,
+    geometria_subcuenca,
+    huella_territorial,
+    nombres_subcuencas,
+)
 
 
 if not st.session_state.get("_pagina_configurada"):
@@ -119,7 +130,7 @@ st.markdown(
     .stApp {background: var(--institucional-fondo); color: var(--institucional-tinta);}
     html {color-scheme: light;}
     .block-container {
-        padding: 3.5rem .55rem .85rem;
+        padding: 3.35rem .45rem .7rem;
         max-width: none;
     }
     .block-container [data-testid="stVerticalBlock"] {gap: .55rem;}
@@ -186,9 +197,9 @@ st.markdown(
     }
     [data-testid="stSidebar"][data-collapsed="false"] {
         border-right: 1px solid var(--institucional-borde);
-        width: 315px !important;
-        min-width: 315px;
-        max-width: 315px;
+        width: 340px !important;
+        min-width: 340px;
+        max-width: 340px;
         box-shadow: 6px 0 20px rgba(6,42,94,.05);
     }
     [data-testid="stSidebar"][data-collapsed="true"] {
@@ -214,6 +225,48 @@ st.markdown(
     }
     [data-testid="stSidebar"] [data-testid="stExpander"] summary {
         color:var(--institucional-verde)!important;font-weight:700;
+    }
+    [data-testid="stSidebar"] [data-testid="stTabs"] [data-baseweb="tab-list"] {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0;
+        background: #ffffff;
+        border-bottom: 1px solid var(--institucional-borde);
+    }
+    [data-testid="stSidebar"] [data-testid="stTabs"] button[role="tab"] {
+        min-width: 0;
+        min-height: 48px;
+        padding: .45rem .25rem;
+        color: var(--institucional-suave) !important;
+        font-size: .68rem;
+        font-weight: 750;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+    }
+    [data-testid="stSidebar"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+        color: var(--institucional-verde) !important;
+        box-shadow: inset 0 -4px 0 var(--institucional-verde-acento);
+    }
+    [data-testid="stSidebar"] [data-testid="stTabs"] [data-baseweb="tab-panel"] {
+        padding: .65rem 0 5.5rem;
+    }
+    [data-testid="stSidebar"] .st-key-acciones_sidebar {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        z-index: 30;
+        width: 340px;
+        margin: 0;
+        padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom, 0px));
+        border-top: 1px solid var(--institucional-borde);
+        background: rgba(255,255,255,.98);
+        box-shadow: 0 -8px 18px rgba(6,42,94,.08);
+    }
+    [data-testid="stSidebar"][data-collapsed="true"] .st-key-acciones_sidebar {
+        display: none;
     }
     #MainMenu, footer {visibility: hidden;}
     iframe {max-width: 100% !important;}
@@ -796,9 +849,9 @@ st.markdown(
         justify-content: space-between;
         align-items: center;
         gap: .65rem;
-        min-height: 54px;
-        margin: 0 0 .3rem;
-        padding: .5rem .75rem;
+        min-height: 46px;
+        margin: 0 0 .2rem;
+        padding: .4rem .65rem;
         border: 0;
         border-bottom: 5px solid var(--institucional-verde-acento);
         border-radius: 0;
@@ -866,7 +919,7 @@ st.markdown(
     .mapa-nota {margin:0 0 .35rem;padding:.35rem .5rem;border-left:4px solid var(--institucional-verde-acento);background:#f3f8e9;color:var(--institucional-suave);font-size:.8rem;line-height:1.35;}
     .dashboard-area {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 1px;
         margin: .15rem 0 .45rem;
         border: 1px solid var(--institucional-borde);
@@ -896,7 +949,7 @@ st.markdown(
         overflow-wrap: anywhere;
     }
     .dashboard-estado {
-        margin: .65rem 0 .85rem;
+        margin: .35rem 0 .5rem;
         padding: .75rem .85rem;
         border-left: 4px solid var(--institucional-verde-acento);
         background: #f3f8e9;
@@ -991,6 +1044,10 @@ st.markdown(
         background: #ffffff;
         border-radius: 6px !important;
     }
+    .resultado-bajo-mapa {
+        margin-top: .2rem;
+        padding: .2rem .1rem 0;
+    }
     iframe[title="streamlit_folium.st_folium"] {
         border: 1px solid var(--institucional-borde);
         border-radius: 6px;
@@ -1006,10 +1063,15 @@ st.markdown(
             min-width: auto;
             max-width: none;
         }
+        [data-testid="stSidebar"] .st-key-acciones_sidebar {
+            width: 100%;
+            max-width: 100vw;
+        }
         .cabecera-app {padding: 1.2rem;}
         .cabecera-app h1 {font-size: 2rem; line-height: 1.15;}
         .visor-barra {align-items: flex-start; flex-direction: column;}
         .visor-contexto {justify-content: flex-start;}
+        .dashboard-area {grid-template-columns: 1fr 1fr;}
     }
     @media (max-width: 480px) {
         .flujo-pasos, .contexto-analisis, .entregables, .resumen-principiante,
@@ -1031,6 +1093,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# El CSS del HTML entregado es la fuente visual final y prevalece sobre los
+# estilos históricos que aún usan componentes internos de la aplicación.
+inyectar_estilo_portal()
+
 
 # -----------------------------------------------------------------------------
 # Configuración centralizada
@@ -1046,7 +1112,29 @@ def secreto_opcional(nombre, predeterminado=None):
         return predeterminado
 
 
-APP_VERSION = "UX-5.0-PORTAL-ERI"
+APP_VERSION = "UX-5.3-HTML-EXACTO-LIMITES-LOCALES"
+
+MAPAS_BASE = {
+    "Imagen satelital": {
+        "tiles": (
+            "https://server.arcgisonline.com/ArcGIS/rest/services/"
+            "World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        ),
+        "attr": "Esri",
+        "max_zoom": 20,
+    },
+    "Mapa claro": {
+        "tiles": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        "attr": "OpenStreetMap contributors · CARTO",
+        "max_zoom": 20,
+        "subdomains": "abcd",
+    },
+    "OpenStreetMap": {
+        "tiles": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "attr": "OpenStreetMap contributors",
+        "max_zoom": 19,
+    },
+}
 
 COLORES_FUENTES = {
     "JRC TMF": "#1F8A70",
@@ -1085,12 +1173,7 @@ VALOR_COBERTURA_BOSQUE_2021 = "Bosques y Otras Tierras Boscosas"
 RADIO_BUSQUEDA_CORREDOR_M = 5_000
 TOLERANCIA_GEOMETRIA_CONECTIVIDAD_M = 10
 
-ASSET_CUENCA = (
-    "projects/ee-julissaguevaravega/assets/"
-    "CuencasHidrograficadeInteres"
-)
 ASSET_FINCAS = secreto_opcional("EE_ASSET_FINCAS")
-ASSET_SUBCUENCAS = secreto_opcional("EE_ASSET_SubCuencas")
 ASSET_BOSQUE_2021 = secreto_opcional("EE_ASSET_BOSQUE_2021")
 ACCESO_FINCA_DURACION_SEG = 30 * 60
 ACCESO_FINCA_MAX_INTENTOS = 5
@@ -1459,29 +1542,35 @@ def construir_registro_metodologico(
             "identificador": str(finca_id),
             "geometria_vectorial_incluida": False,
             "fuente": "coleccion_privada_configurada_en_el_servidor",
-            "recorte": ASSET_CUENCA,
+            "recorte": FUENTE_CUENCA,
         }
     elif tipo_area == TIPO_AREA_SUBCUENCA:
         especificacion_area = {
             "tipo": "subcuenca",
             "identificador": str(subcuenca_nombre),
-            "asset": ASSET_SUBCUENCAS,
-            "campo_identificador": "SUBCUENC_2",
-            "geometria_vectorial_incluida": False,
-            "recorte": ASSET_CUENCA,
+            "fuente": FUENTE_SUBCUENCAS,
+            "geometria_vectorial_incluida": True,
+            "geojson": geometria_subcuenca(subcuenca_nombre),
+            "recorte": FUENTE_CUENCA,
         }
     elif tipo_area == TIPO_AREA_DIBUJADA:
         especificacion_area = {
             "tipo": "poligono_dibujado",
             "geojson": json.loads(geometria_geojson),
-            "recorte": ASSET_CUENCA,
+            "recorte": FUENTE_CUENCA,
         }
     else:
-        especificacion_area = {"tipo": "cuenca", "asset": ASSET_CUENCA}
+        especificacion_area = {
+            "tipo": "cuenca",
+            "fuente": FUENTE_CUENCA,
+            "geometria_vectorial_incluida": True,
+            "geojson": geometria_cuenca(),
+        }
 
     configuracion = {
         "metodologia": METHODOLOGY_VERSION,
         "modo_analisis": modo_analisis,
+        "version_limites_locales": huella_territorial(),
         "area": especificacion_area,
         "periodos": {
             "referencia_metodologica": ANO_REFERENCIA_ANALISIS,
@@ -1840,10 +1929,12 @@ def procesar_codigo_acceso_fincas():
     st.session_state["codigo_acceso_fincas"] = ""
 
 
-def solicitar_acceso_fincas():
+def solicitar_acceso_fincas(contenedor=None):
+    if contenedor is None:
+        contenedor = st.sidebar
     codigo_configurado = str(secreto_opcional("FINCAS_ACCESS_CODE", ""))
     if not ASSET_FINCAS or len(codigo_configurado) < 8:
-        st.sidebar.error(
+        contenedor.error(
             "El acceso privado a las fincas no está configurado. El administrador debe "
             "definir EE_ASSET_FINCAS y FINCAS_ACCESS_CODE en los secretos de Streamlit."
         )
@@ -1851,42 +1942,42 @@ def solicitar_acceso_fincas():
 
     mensaje = st.session_state.pop("mensaje_acceso_fincas", None)
     if acceso_fincas_vigente():
-        st.sidebar.success("Acceso privado a fincas activo")
-        st.sidebar.caption("La autorización caduca automáticamente después de 30 minutos.")
-        st.sidebar.button(
+        contenedor.success("Acceso privado a fincas activo")
+        contenedor.caption("La autorización caduca automáticamente después de 30 minutos.")
+        contenedor.button(
             "Cerrar acceso a fincas",
             on_click=cerrar_acceso_fincas,
             use_container_width=True,
         )
         if mensaje and mensaje[0] == "success":
-            st.sidebar.success(mensaje[1])
+            contenedor.success(mensaje[1])
         return True
 
     bloqueo_hasta = float(st.session_state.get("fincas_bloqueo_hasta", 0))
     if time.time() < bloqueo_hasta:
-        st.sidebar.warning(
+        contenedor.warning(
             "Acceso temporalmente bloqueado. Espere un minuto antes de volver a intentarlo."
         )
         return False
 
-    st.sidebar.info(
+    contenedor.info(
         "Esta opción contiene información privada. Ingrese el código autorizado para "
         "consultar la lista de fincas."
     )
-    st.sidebar.text_input(
+    contenedor.text_input(
         "Código de acceso",
         type="password",
         key="codigo_acceso_fincas",
         help="El código no se guarda en GitHub ni se incluye en los informes.",
     )
-    st.sidebar.button(
+    contenedor.button(
         "Acceder a las fincas",
         type="primary",
         on_click=procesar_codigo_acceso_fincas,
         use_container_width=True,
     )
     if mensaje:
-        getattr(st.sidebar, mensaje[0])(mensaje[1])
+        getattr(contenedor, mensaje[0])(mensaje[1])
     return False
 
 
@@ -1930,20 +2021,9 @@ def obtener_ids_fincas():
     )
 
 
-@st.cache_data(ttl=3600, max_entries=4)
+@st.cache_data(max_entries=4)
 def obtener_ids_subcuencas():
-    if not ASSET_SUBCUENCAS:
-        raise PermissionError("La colección de subcuencas no está configurada.")
-    valores = (
-        ee.FeatureCollection(ASSET_SUBCUENCAS)
-        .aggregate_array("SUBCUENC_2")
-        .distinct()
-        .getInfo()
-    )
-    return sorted(
-        [valor for valor in valores if valor is not None],
-        key=clave_orden_natural,
-    )
+    return sorted(nombres_subcuencas(), key=clave_orden_natural)
 
 
 def obtener_geometria_solicitada(
@@ -1962,15 +2042,9 @@ def obtener_geometria_solicitada(
         )
 
     if tipo_area == TIPO_AREA_SUBCUENCA:
-        if not ASSET_SUBCUENCAS:
-            raise PermissionError("La colección de subcuencas no está configurada.")
         if subcuenca_nombre is None:
             raise ValueError("Debe seleccionar una subcuenca antes de ejecutar el análisis.")
-        return (
-            ee.FeatureCollection(ASSET_SUBCUENCAS)
-            .filter(ee.Filter.eq("SUBCUENC_2", subcuenca_nombre))
-            .geometry()
-        )
+        return ee.Geometry(geometria_subcuenca(subcuenca_nombre))
 
     if tipo_area == TIPO_AREA_DIBUJADA:
         if not geometria_geojson:
@@ -1982,7 +2056,7 @@ def obtener_geometria_solicitada(
         )
         return ee.Geometry(datos_geometria)
 
-    return ee.FeatureCollection(ASSET_CUENCA).geometry()
+    return ee.Geometry(geometria_cuenca())
 
 
 def obtener_area(
@@ -1997,11 +2071,11 @@ def obtener_area(
         subcuenca_nombre=subcuenca_nombre,
         geometria_geojson=geometria_geojson,
     )
-    geometria_cuenca = ee.FeatureCollection(ASSET_CUENCA).geometry()
+    geometria_cuenca_local = ee.Geometry(geometria_cuenca())
     geometria_analisis = aplicar_limite_cuenca(
         tipo_area,
         geometria_solicitada,
-        geometria_cuenca,
+        geometria_cuenca_local,
     )
     return ee.FeatureCollection(
         [ee.Feature(geometria_analisis, {"Origen": tipo_area})]
@@ -2523,6 +2597,79 @@ def capa_gee(
         show=mostrar,
         opacity=opacidad,
         **opciones_capa,
+    )
+    capa.add_to(mapa)
+    return capa
+
+
+def agregar_mapa_base(mapa, nombre_mapa, control=False):
+    """Agrega al visor el fondo elegido en la pestaña Mapa base."""
+
+    configuracion = dict(MAPAS_BASE.get(nombre_mapa, MAPAS_BASE["Imagen satelital"]))
+    folium.TileLayer(
+        name=nombre_mapa,
+        overlay=False,
+        control=control,
+        **configuracion,
+    ).add_to(mapa)
+
+
+def agregar_limite_cuenca_local(mapa, *, control=False, mostrar=True):
+    """Dibuja la cuenca incluida con la app, sin consultar un asset de EE."""
+
+    capa = folium.GeoJson(
+        coleccion_cuenca(),
+        name="Límite de la cuenca",
+        control=control,
+        show=mostrar,
+        style_function=lambda _: {
+            "color": "#062A5E",
+            "weight": 2.4,
+            "opacity": 0.95,
+            "fillColor": "#062A5E",
+            "fillOpacity": 0.025,
+        },
+        highlight_function=lambda _: {
+            "color": "#0A4393",
+            "weight": 3.2,
+            "fillOpacity": 0.05,
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=["nombre"],
+            aliases=["Área:"],
+            sticky=False,
+        ),
+    )
+    capa.add_to(mapa)
+    return capa
+
+
+def agregar_subcuencas_local(mapa, *, control=False, mostrar=False):
+    """Agrega la capa local de subcuencas entregada con el portal HTML."""
+
+    capa = folium.GeoJson(
+        coleccion_subcuencas(),
+        name="Subcuencas del Canal",
+        control=control,
+        show=mostrar,
+        style_function=lambda _: {
+            "color": "#6085B9",
+            "weight": 1.1,
+            "opacity": 0.78,
+            "fillColor": "#0A4393",
+            "fillOpacity": 0.015,
+        },
+        highlight_function=lambda _: {
+            "color": "#77CC09",
+            "weight": 2.2,
+            "fillOpacity": 0.08,
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=["nombre", "grupo", "area_ha"],
+            aliases=["Subcuenca:", "Grupo:", "Superficie (ha):"],
+            localize=True,
+            sticky=False,
+        ),
     )
     capa.add_to(mapa)
     return capa
@@ -4105,7 +4252,6 @@ def mostrar_barra_visor(contenido_modo):
           <div class="visor-contexto">
             <span class="visor-etiqueta">{html_lib.escape(contenido_modo['titulo'])}</span>
             <span class="visor-etiqueta">ERI complementario</span>
-            <span class="visor-etiqueta">Resultado indicativo</span>
           </div>
         </header>
         """,
@@ -5467,6 +5613,19 @@ def establecer_modo_analisis(modo):
     st.session_state.pop("capa_a_reordenar", None)
 
 
+def cambiar_modo_desde_sidebar():
+    """Sincroniza el selector del portal con la sesión y la URL pública."""
+
+    nuevo_modo = st.session_state.get("selector_modo_sidebar")
+    if nuevo_modo not in MODOS_ANALISIS:
+        return
+    if nuevo_modo != st.session_state.get("modo_analisis"):
+        establecer_modo_analisis(nuevo_modo)
+    st.query_params.clear()
+    st.query_params["seccion"] = "mapa"
+    st.query_params["modo"] = nuevo_modo
+
+
 def abrir_resultados_contextuales():
     st.session_state["mostrar_resultados"] = True
 
@@ -6719,31 +6878,36 @@ if modo_analisis is None:
 contenido_modo = MODOS_ANALISIS[modo_analisis]
 analiza_cambios = modo_analisis in (MODO_TERRITORIAL, MODO_INTEGRAL)
 analiza_conectividad = modo_analisis in (MODO_CORREDORES, MODO_INTEGRAL)
-mostrar_barra_visor(contenido_modo)
-if seccion_tablero == "Análisis":
-    columna_contexto, columna_volver, columna_cambiar = st.columns([4, 1, 1])
-    columna_volver.button(
-        "Volver al mapa",
-        use_container_width=True,
-        on_click=volver_al_mapa,
-        key="volver_mapa_resultados",
-    )
-else:
-    columna_contexto, columna_cambiar = st.columns([5, 1])
-columna_contexto.caption(
-    f"{contenido_modo['pregunta']} · {contenido_modo['resultado']}"
-)
-if columna_cambiar.button("Cambiar análisis", use_container_width=True):
-    limpiar_estado_resultados()
-    st.session_state.pop("modo_analisis", None)
-    st.session_state["mostrar_resultados"] = False
-    st.rerun()
 
 try:
     iniciar_earth_engine()
 
-    st.sidebar.markdown("## Área de análisis")
-    st.sidebar.caption(f"{contenido_modo['titulo']} · seleccione la unidad territorial")
+    panel_capas, panel_filtros, panel_mapa_base = st.sidebar.tabs(
+        ["Capas", "Polígono", "Mapa base"]
+    )
+    acciones_sidebar = st.sidebar.container(key="acciones_sidebar")
+
+    mapa_base = panel_mapa_base.selectbox(
+        "Fondo cartográfico",
+        list(MAPAS_BASE),
+        help="Cambia únicamente el fondo de referencia; no modifica los cálculos.",
+    )
+    panel_mapa_base.caption(
+        "Use imagen satelital para inspección visual y mapa claro cuando necesite "
+        "distinguir mejor las capas temáticas."
+    )
+
+    panel_filtros.markdown("### Área de análisis")
+    if st.session_state.get("selector_modo_sidebar") not in MODOS_ANALISIS:
+        st.session_state["selector_modo_sidebar"] = modo_analisis
+    panel_filtros.selectbox(
+        "Tipo de preevaluación",
+        list(MODOS_ANALISIS),
+        format_func=lambda valor: MODOS_ANALISIS[valor]["titulo"],
+        key="selector_modo_sidebar",
+        on_change=cambiar_modo_desde_sidebar,
+        help="Cambia la lectura del portal y conserva el área seleccionada cuando es compatible.",
+    )
     etiquetas_area = {
         "Finca de monitoreo": "Finca registrada (recomendado)",
         "Subcuenca": "Subcuenca de la CHCP",
@@ -6751,57 +6915,44 @@ try:
         "Toda la cuenca": "Toda la cuenca (análisis regional)",
     }
     descripciones_area = {
-        "Finca de monitoreo": (
-            "Opción más rápida. Seleccione una finca disponible después de autorizar el acceso."
-        ),
-        "Subcuenca": (
-            "La subcuenca se recorta automáticamente al límite de la cuenca principal. "
-            "Las partes exteriores no participan en el análisis."
-        ),
-        "Dibujar polígono en el mapa": (
-            "Úsela cuando el área no aparece en la lista. Cualquier parte dibujada fuera "
-            "de la cuenca principal se excluye automáticamente."
-        ),
-        "Toda la cuenca": (
-            "Evalúa la región completa. Requiere más tiempo y es menos detallada para decisiones prediales."
-        ),
+        "Finca de monitoreo": "Seleccione una finca registrada.",
+        "Subcuenca": "Se recorta automáticamente al límite de la CHCP.",
+        "Dibujar polígono en el mapa": "La parte exterior de la CHCP se excluye.",
+        "Toda la cuenca": "Análisis regional; puede requerir más tiempo.",
     }
-    tipo_area = st.sidebar.radio(
-        "¿Qué área desea analizar?",
+    tipo_area = panel_filtros.selectbox(
+        "Unidad territorial",
         ["Finca de monitoreo", "Subcuenca", "Dibujar polígono en el mapa", "Toda la cuenca"],
         format_func=lambda valor: etiquetas_area[valor],
         help="Se recomienda iniciar con una finca. El análisis de toda la cuenca puede tardar varios minutos.",
     )
-    st.sidebar.caption(descripciones_area[tipo_area])
+    panel_filtros.caption(descripciones_area[tipo_area])
     finca_seleccionada = None
     subcuenca_seleccionada = None
     geometria_dibujada_json = st.session_state.get("geometria_dibujada_json")
     version_mapa_dibujo = st.session_state.get("version_mapa_dibujo", 0)
     if tipo_area == "Finca de monitoreo":
-        if not solicitar_acceso_fincas():
+        if not solicitar_acceso_fincas(panel_filtros):
             st.info(
                 "El acceso a las fincas está protegido. Ingrese el código en el panel lateral "
                 "o seleccione otra unidad territorial."
             )
             st.stop()
-        finca_seleccionada = st.sidebar.selectbox(
+        finca_seleccionada = panel_filtros.selectbox(
             "Finca:",
             obtener_ids_fincas(),
             format_func=str,
             help="Las fincas están ordenadas de forma natural: 1, 2, 3...",
         )
     elif tipo_area == TIPO_AREA_SUBCUENCA:
-        if not ASSET_SUBCUENCAS:
-            st.error(
-                "La colección de subcuencas no está configurada. El administrador debe "
-                "definir EE_ASSET_SubCuencas en los secretos de Streamlit."
-            )
-            st.stop()
-        subcuenca_seleccionada = st.sidebar.selectbox(
+        subcuenca_seleccionada = panel_filtros.selectbox(
             "Subcuenca:",
             obtener_ids_subcuencas(),
             format_func=str,
-            help="Seleccione la subcuenca que desea evaluar.",
+            help=(
+                "Seleccione una de las subcuencas incluidas en la aplicación. "
+                "Esta geometría ya no depende de un asset privado de Earth Engine."
+            ),
         )
     elif tipo_area == TIPO_AREA_DIBUJADA:
         st.subheader("1. Dibuje el área que desea preevaluar")
@@ -6825,34 +6976,17 @@ try:
             tiles=None,
             control_scale=True,
         )
-        folium.TileLayer(
-            tiles=(
-                "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                "World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            ),
-            attr="Esri",
-            name="Imagen satelital",
-            overlay=False,
-            control=False,
-            max_zoom=20,
-        ).add_to(mapa_dibujo)
-        cuenca_dibujo = ee.FeatureCollection(ASSET_CUENCA)
-        capa_gee(
-            mapa_dibujo,
-            cuenca_dibujo.style(color="FF4444", fillColor="00000000", width=3),
-            {},
-            "Límite de la cuenca",
-            control=False,
-        )
+        agregar_mapa_base(mapa_dibujo, mapa_base, control=False)
+        agregar_limite_cuenca_local(mapa_dibujo, control=False)
         if geometria_dibujada_json:
             folium.GeoJson(
                 json.loads(geometria_dibujada_json),
                 name="Polígono dibujado",
                 style_function=lambda _: {
-                    "color": "#00E5FF",
-                    "weight": 4,
-                    "fillColor": "#00E5FF",
-                    "fillOpacity": 0.12,
+                    "color": "#D0442C",
+                    "weight": 2.6,
+                    "fillColor": "#D0442C",
+                    "fillOpacity": 0.08,
                 },
             ).add_to(mapa_dibujo)
         Draw(
@@ -6867,12 +7001,12 @@ try:
                 "polygon": {
                     "allowIntersection": False,
                     "showArea": True,
-                    "shapeOptions": {"color": "#00E5FF", "weight": 4},
+                    "shapeOptions": {"color": "#D0442C", "weight": 2.6},
                 },
             },
             edit_options={"edit": True, "remove": True},
         ).add_to(mapa_dibujo)
-        mapa_dibujo.fit_bounds(obtener_limites(cuenca_dibujo))
+        mapa_dibujo.fit_bounds(obtener_limites_geojson(coleccion_cuenca()))
         resultado_dibujo = st_folium(
             mapa_dibujo,
             height=520,
@@ -6917,19 +7051,19 @@ try:
     if superficie_ha <= 0:
         st.error(
             "El área seleccionada no intersecta la cuenca. Seleccione otra unidad o "
-            "dibuje un polígono dentro del límite rojo."
+            "dibuje un polígono dentro del límite de la cuenca."
         )
         st.stop()
     superficie_excluida_ha = max(0.0, superficie_original_ha - superficie_ha)
     if area_debe_recortarse_a_cuenca(tipo_area) and superficie_excluida_ha > 0.01:
-        st.warning(
-            f"El área seleccionada sobrepasa el límite rojo. Se excluyeron "
+        panel_filtros.warning(
+            f"El área seleccionada sobrepasa el límite de la cuenca. Se excluyeron "
             f"{superficie_excluida_ha:,.1f} ha; el análisis usará únicamente las "
             f"{superficie_ha:,.1f} ha ubicadas dentro de la cuenca."
         )
     elif area_debe_recortarse_a_cuenca(tipo_area):
-        st.caption(
-            "El análisis se limita al área ubicada dentro del límite rojo de la cuenca."
+        panel_filtros.caption(
+            "El análisis se limita al área ubicada dentro del límite de la cuenca."
         )
 
     bosque_automatico_disponible = bool(ASSET_BOSQUE_2021)
@@ -6947,15 +7081,14 @@ try:
     )
     catalogo_corredores = cargar_catalogo_corredores()
 
-    st.sidebar.markdown("---")
     if analiza_conectividad:
         if not bosque_automatico_disponible:
-            st.sidebar.warning(
+            panel_filtros.warning(
                 "La red de fragmentos no está disponible. Aun puede consultar los "
                 "corredores publicados."
             )
 
-        with st.sidebar.expander("Opciones técnicas · opcional", expanded=False):
+        with panel_filtros.expander("Opciones técnicas · opcional", expanded=False):
             st.caption(
                 "Conserve los valores recomendados salvo que necesite una lectura técnica."
             )
@@ -6980,24 +7113,28 @@ try:
                 ),
             )
 
-    st.sidebar.markdown("---")
-    titulo_vista_mapa = (
-        "### Mapa recomendado"
-        if modo_analisis == MODO_INTEGRAL
-        else "### Vista inicial del mapa"
-    )
-    st.sidebar.markdown(titulo_vista_mapa)
+    with panel_capas.expander("Límites", expanded=True):
+        mostrar_limite_cuenca = st.checkbox(
+            "Cuenca del Canal",
+            value=True,
+            help="Límite local incluido con la aplicación; no consulta un asset de Earth Engine.",
+        )
+        mostrar_subcuencas_local = st.checkbox(
+            "Subcuencas del Canal",
+            value=False,
+            help="Muestra las 53 unidades territoriales incluidas en el portal HTML.",
+        )
+
+    panel_capas.markdown("### Capas del mapa")
     opciones_objetivo = PERFILES_POR_MODO[modo_analisis]
     if len(opciones_objetivo) == 1:
         objetivo = opciones_objetivo[0]
         if modo_analisis == MODO_INTEGRAL:
-            st.sidebar.success(
-                "La aplicación preparará automáticamente una vista resumida para decidir."
-            )
+            panel_capas.caption("Vista combinada preparada automáticamente.")
         else:
-            st.sidebar.markdown(f"**{objetivo}**")
+            panel_capas.markdown(f"**{objetivo}**")
     else:
-        objetivo = st.sidebar.selectbox(
+        objetivo = panel_capas.selectbox(
             "¿Qué desea ver en el mapa?",
             opciones_objetivo,
             help=(
@@ -7006,19 +7143,7 @@ try:
             ),
         )
     perfil = PERFILES_VISUALIZACION[objetivo]
-    st.sidebar.caption(perfil["descripcion"])
-    with st.sidebar.expander("Acerca de esta vista", expanded=False):
-        if modo_analisis == MODO_INTEGRAL:
-            st.caption(
-                "El mapa reúne los sectores prioritarios, corredores, fragmentos clave "
-                "y la conexión potencial cuando existe. No necesita escoger capas para "
-                "obtener la conclusión integrada."
-            )
-        else:
-            st.caption(
-                "Esta selección solo organiza el mapa. Las fuentes y reglas del análisis "
-                "se mantienen fijas para que los resultados sean comparables."
-            )
+    panel_capas.caption(perfil["descripcion"])
 
     opciones_capas = [
         "Sectores para revisión",
@@ -7081,64 +7206,64 @@ try:
         capa_visible_inicial = None
         if modo_comparador == "JRC TMF":
             opciones_inicio_tmf = list(range(1990, ANO_TMF_MAX))
-            anio_tmf_inicial = st.sidebar.selectbox(
+            anio_tmf_inicial = panel_filtros.selectbox(
                 "Año inicial (JRC):",
                 opciones_inicio_tmf,
                 index=opciones_inicio_tmf.index(2020),
             )
             opciones_final_tmf = list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))
-            anio_tmf_final = st.sidebar.selectbox(
+            anio_tmf_final = panel_filtros.selectbox(
                 "Año final (JRC):",
                 opciones_final_tmf,
                 index=len(opciones_final_tmf) - 1,
             )
-            st.sidebar.caption(
+            panel_filtros.caption(
                 f"Comparación visual. El análisis no resta estos años: clasifica el "
                 f"estado JRC de {ANO_DIAG_TMF}."
             )
         elif modo_comparador == "ESRI LULC":
             opciones_inicio_esri = list(range(ANO_ESRI_MIN, ANO_ESRI_MAX))
-            anio_esri_inicial = st.sidebar.selectbox(
+            anio_esri_inicial = panel_filtros.selectbox(
                 "Año inicial (ESRI):",
                 opciones_inicio_esri,
             )
             opciones_final_esri = list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))
-            anio_esri_final = st.sidebar.selectbox(
+            anio_esri_final = panel_filtros.selectbox(
                 "Año final (ESRI):",
                 opciones_final_esri,
                 index=len(opciones_final_esri) - 1,
             )
-            st.sidebar.caption(
+            panel_filtros.caption(
                 f"El análisis usa los extremos disponibles {ANO_ESRI_MIN} y "
                 f"{ANO_ESRI_MAX}; esta selección solo cambia el comparador."
             )
         else:
             opciones_inicio_ndvi = list(range(2017, ANO_NDVI_MAX))
-            anio_ndvi_inicial = st.sidebar.selectbox(
+            anio_ndvi_inicial = panel_filtros.selectbox(
                 "Año inicial (NDVI):",
                 opciones_inicio_ndvi,
                 index=opciones_inicio_ndvi.index(2022),
             )
             opciones_final_ndvi = list(range(anio_ndvi_inicial + 1, ANO_NDVI_MAX + 1))
-            anio_ndvi_final = st.sidebar.selectbox(
+            anio_ndvi_final = panel_filtros.selectbox(
                 "Año final (NDVI):",
                 opciones_final_ndvi,
                 index=len(opciones_final_ndvi) - 1,
             )
-            st.sidebar.caption(
+            panel_filtros.caption(
                 "Comparación visual de vigor vegetal. El período elegido aquí no cambia "
                 f"la señal ponderada, que utiliza {ANO_NDVI_INICIAL_ANALISIS}-{ANO_NDVI_FINAL_ANALISIS}."
             )
     else:
         modo_comparador = "Sin comparador"
         capas_activas = []
-        st.sidebar.markdown("### Capas e indicadores")
-        st.sidebar.caption(
+        panel_capas.markdown("### Capas e indicadores")
+        panel_capas.caption(
             "Active una o varias fuentes. Cada bloque explica qué información aporta."
         )
 
         if analiza_cambios:
-            if st.sidebar.checkbox(
+            if panel_capas.checkbox(
                 "Resultado combinado · sectores para revisión",
                 value="Sectores para revisión" in perfil["capas"],
                 key=f"capa_resultado_{modo_analisis}",
@@ -7146,7 +7271,7 @@ try:
             ):
                 capas_activas.append("Sectores para revisión")
 
-            with st.sidebar.expander("JRC Tropical Moist Forest", expanded=True):
+            with panel_capas.expander("JRC Tropical Moist Forest", expanded=True):
                 st.caption("Estado anual del bosque tropical desde 1990.")
                 if st.checkbox(
                     "Estado forestal",
@@ -7183,7 +7308,7 @@ try:
                     key=f"anio_jrc_{modo_analisis}",
                 )
 
-            with st.sidebar.expander("Hansen Global Forest Change", expanded=False):
+            with panel_capas.expander("Hansen Global Forest Change", expanded=False):
                 st.caption("Pérdida anual de cobertura arbórea desde 2001.")
                 if st.checkbox(
                     "Pérdida posterior a 2020",
@@ -7204,7 +7329,7 @@ try:
                 ):
                     capas_activas.append("Cobertura arbórea persistente")
 
-            with st.sidebar.expander("ESRI Land Use / Land Cover", expanded=False):
+            with panel_capas.expander("ESRI Land Use / Land Cover", expanded=False):
                 st.caption("Cobertura del suelo y cambios de la clase árboles.")
                 if st.checkbox(
                     "Uso y cobertura del suelo",
@@ -7225,7 +7350,7 @@ try:
                     key=f"anio_esri_{modo_analisis}",
                 )
 
-            with st.sidebar.expander("Sentinel-2 · NDVI", expanded=False):
+            with panel_capas.expander("Sentinel-2 · NDVI", expanded=False):
                 st.caption("Vigor de la vegetación y disminución entre períodos.")
                 if st.checkbox(
                     "Cambio del vigor vegetal",
@@ -7252,7 +7377,7 @@ try:
                     key=f"anio_ndvi_cambio_{modo_analisis}",
                 )
 
-            with st.sidebar.expander("GEDI · altura del dosel", expanded=False):
+            with panel_capas.expander("GEDI · altura del dosel", expanded=False):
                 st.caption("Estructura vertical disponible; no es una serie anual continua.")
                 if st.checkbox(
                     "Altura del dosel",
@@ -7261,7 +7386,7 @@ try:
                 ):
                     capas_activas.append("Altura GEDI")
 
-        with st.sidebar.expander("ERI · resiliencia ecológica", expanded=False):
+        with panel_capas.expander("ERI · resiliencia ecológica", expanded=False):
             st.caption(
                 "Síntesis complementaria de estructura, conectividad local, estabilidad "
                 "topográfica y proximidad riparia."
@@ -7278,7 +7403,7 @@ try:
                 capas_activas.append("ERI indicativo")
 
         if analiza_conectividad:
-            with st.sidebar.expander("Almanaque Azul · corredores", expanded=True):
+            with panel_capas.expander("Almanaque Azul · corredores", expanded=True):
                 mostrar_interseccion_corredores_mapa = st.checkbox(
                     "Coincidencia dentro del área analizada",
                     value=True,
@@ -7302,7 +7427,7 @@ try:
                     value=False,
                     key=f"capa_puntos_{modo_analisis}",
                 )
-            with st.sidebar.expander(
+            with panel_capas.expander(
                 f"{FUENTE_BOSQUE_ORGANIZACION} · bosque {ANO_BOSQUE_REFERENCIA}",
                 expanded=modo_analisis == MODO_CORREDORES,
             ):
@@ -7337,7 +7462,7 @@ try:
 
         orden_capas_mapa = list(capas_activas)
         if not capas_activas and not analiza_conectividad:
-            st.sidebar.warning("Active al menos una capa territorial para mostrarla en el mapa.")
+            panel_capas.warning("Active al menos una capa territorial para mostrarla en el mapa.")
 
     capa_contextual = resolver_capa_contextual(
         modo_analisis,
@@ -7360,12 +7485,14 @@ try:
         ANO_ESRI_MAX,
         geometria_dibujada_json,
         catalogo_corredores["version_publicada"],
+        huella_territorial(),
         huella_bosque,
         umbral_conectividad_m,
         area_min_parche_ha,
     )
     firma_visual_actual = (
         firma_analisis_actual,
+        mapa_base,
         modo_mapa,
         modo_comparador,
         anio_tmf_inicial,
@@ -7387,63 +7514,55 @@ try:
         mostrar_interseccion_corredores_mapa,
         mostrar_corredores_contexto_mapa,
         mostrar_puntos_criticos_mapa,
+        mostrar_limite_cuenca,
+        mostrar_subcuencas_local,
     )
     analisis_actual = (
         st.session_state.get("firma_analisis") == firma_analisis_actual
     )
     if seccion_tablero == "Análisis":
-        st.sidebar.markdown("## Resultados")
-        st.sidebar.caption(
-            "Está consultando el resultado preparado para el área seleccionada."
-        )
-        st.sidebar.button(
+        acciones_sidebar.button(
             "Volver al mapa",
+            type="primary",
             use_container_width=True,
             key="volver_mapa_sidebar",
             on_click=volver_al_mapa,
         )
         solicitar_analisis = False
     else:
-        st.sidebar.markdown("## Crear análisis")
-        st.sidebar.caption(
-            "Los controles anteriores cambian la vista. Este botón ejecuta los cálculos "
-            "para el área seleccionada."
-        )
-        solicitar_analisis = st.sidebar.button(
-            "Actualizar análisis" if analisis_actual else "Crear análisis",
+        solicitar_analisis = acciones_sidebar.button(
+            "Actualizar" if analisis_actual else "Realizar análisis",
             type="primary",
             use_container_width=True,
             key="crear_analisis_panel",
             help=f"Procesa únicamente la información de {contenido_modo['titulo'].lower()}.",
         )
-        if analisis_actual:
-            st.sidebar.button(
-                "Detalle y descargas",
-                use_container_width=True,
-                key="abrir_resultados_sidebar",
-                on_click=abrir_resultados_contextuales,
-                help=(
-                    "Abre las tablas completas, la gráfica temporal por fuente y los "
-                    "archivos de respaldo."
-                ),
-            )
 
     if seccion_tablero == "Análisis":
-        st.markdown("### Análisis del área seleccionada")
+        st.markdown("### Resultados y descargas")
         st.caption(
-            "Consulte la lectura rápida, el detalle por tema, las descargas y una "
-            "gráfica por fuente sin volver a cargar el mapa."
+            "Consulte el detalle por tema y descargue los archivos de respaldo."
         )
         columna_panel = st.container(border=True)
         mapa_resultados_contenedor = None
     else:
-        columna_mapa, columna_panel = st.columns([2.55, 1], gap="small")
-        columna_mapa.markdown(
+        mostrar_panel_resultados = analisis_actual or solicitar_analisis
+        if mostrar_panel_resultados:
+            columna_mapa, columna_resultados = st.columns([3, 1], gap="small")
+            mapa_resultados_contenedor = columna_mapa.container(
+                key="mapa_portal"
+            )
+            columna_panel = columna_resultados.container(
+                key="panel_resultados_visible"
+            )
+        else:
+            mapa_resultados_contenedor = st.container(key="mapa_portal")
+            columna_panel = st.container(key="panel_resultados_oculto")
+        mapa_resultados_contenedor.markdown(
             '<div class="mapa-cabecera"><small>Centro del análisis</small>'
             '<strong>Evidencia cartográfica</strong></div>',
             unsafe_allow_html=True,
         )
-        mapa_resultados_contenedor = columna_mapa.container(border=True)
 
     with columna_panel:
         st.markdown(
@@ -7508,16 +7627,15 @@ try:
                     capas_activas=capas_activas,
                 )
             st.button(
-                "Abrir detalle completo y descargas",
+                "Resultados y descargas",
                 use_container_width=True,
                 key="abrir_resultados_panel",
                 on_click=abrir_resultados_contextuales,
                 help=(
-                    "Mantiene este tablero compacto. El detalle incluye todas las tablas, "
-                    "series por fuente, archivos geográficos e informe."
+                    "Abre las tablas completas, las gráficas por fuente y los archivos "
+                    "de respaldo de la preevaluación."
                 ),
             )
-
         if solicitar_analisis:
             firma_anterior = st.session_state.get("firma_analisis")
             with st.status(
@@ -7605,8 +7723,8 @@ try:
                 resultados_nuevos["modo_analisis"] = modo_analisis
                 st.session_state["resultados_analisis"] = resultados_nuevos
                 st.session_state["firma_analisis"] = firma_analisis_actual
-                # El resultado aparece en la columna derecha sin ocultar el mapa.
-                # La vista extensa se abre únicamente si el usuario solicita el detalle.
+                # El resultado aparece en el panel lateral derecho, como en el portal HTML.
+                # La vista extensa se abre únicamente si el usuario solicita las descargas.
                 st.session_state["mostrar_resultados"] = False
                 if firma_anterior != firma_analisis_actual:
                     st.session_state.pop("pdf_analisis", None)
@@ -7905,17 +8023,7 @@ try:
         prefer_canvas=True,
         **opciones_interaccion_mapa(modo_comparador != "Sin comparador"),
     )
-    folium.TileLayer(
-        tiles=(
-            "https://server.arcgisonline.com/ArcGIS/rest/services/"
-            "World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        ),
-        attr="Esri",
-        name="Imagen satelital",
-        overlay=False,
-        control=True,
-        max_zoom=20,
-    ).add_to(mapa)
+    agregar_mapa_base(mapa, mapa_base, control=True)
     Fullscreen(position="topleft", title="Pantalla completa").add_to(mapa)
 
     capa_izquierda = None
@@ -8211,17 +8319,19 @@ try:
             mostrar_ruta_corredor=mostrar_ruta_corredor,
         )
 
-    cuenca = ee.FeatureCollection(ASSET_CUENCA)
-    capa_limite_cuenca = capa_gee(
+    capa_limite_cuenca = agregar_limite_cuenca_local(
         mapa,
-        cuenca.style(color="FF4444", fillColor="00000000", width=3),
-        {},
-        "Límite de la cuenca",
-        z_index=1000,
+        control=False,
+        mostrar=mostrar_limite_cuenca,
+    )
+    capa_subcuencas = agregar_subcuencas_local(
+        mapa,
+        control=False,
+        mostrar=mostrar_subcuencas_local,
     )
     capa_area_seleccionada = capa_gee(
         mapa,
-        area_seleccionada.style(color="00E5FF", fillColor="00E5FF18", width=4),
+        area_seleccionada.style(color="D0442C", fillColor="D0442C14", width=3),
         {},
         "Área seleccionada",
         z_index=1010,
@@ -8297,17 +8407,17 @@ try:
     with mapa_resultados_contenedor:
         st_folium(
             mapa,
-            height=650,
+            height=780,
             use_container_width=True,
             returned_objects=[],
             key=(
-                f"mapa-{APP_VERSION}-{modo_analisis}-{tipo_area}-{finca_seleccionada}-{subcuenca_seleccionada}-{modo_mapa}-{modo_comparador}-"
+                f"mapa-{APP_VERSION}-{mapa_base}-{modo_analisis}-{tipo_area}-{finca_seleccionada}-{subcuenca_seleccionada}-{modo_mapa}-{modo_comparador}-"
                 f"{anio_tmf_inicial}-{anio_tmf_final}-{anio_esri_inicial}-"
                 f"{anio_esri_final}-{anio_ndvi_inicial}-{anio_ndvi_final}-"
                 f"{anio_tmf_capa}-{anio_esri_capa}-{anio_ndvi_capa}-"
                 f"{'-'.join(orden_capas_mapa)}-"
                 f"{capa_visible_inicial}-"
-                f"{catalogo_corredores['version_publicada']}-{huella_bosque}-"
+                f"{catalogo_corredores['version_publicada']}-{huella_territorial()}-{huella_bosque}-"
                 f"{umbral_conectividad_m}-{area_min_parche_ha}-"
                 f"{mostrar_fragmentos_bosque}-{mostrar_conexiones_bosque}-"
                 f"{mostrar_bosque_contexto}-"
@@ -8315,6 +8425,7 @@ try:
                 f"{mostrar_interseccion_corredores_mapa}-"
                 f"{mostrar_corredores_contexto_mapa}-"
                 f"{mostrar_puntos_criticos_mapa}-"
+                f"{mostrar_limite_cuenca}-{mostrar_subcuencas_local}-"
                 f"{hash(geometria_dibujada_json or '')}"
             ),
         )
