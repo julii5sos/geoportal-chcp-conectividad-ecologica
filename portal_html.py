@@ -22,6 +22,17 @@ CSS_PORTAL_HTML = r"""
 html,body,[data-testid="stAppViewContainer"],.stApp{font-family:var(--portal-font)!important;background:#fff!important;color:var(--ink)!important;}
 [data-testid="stHeader"]{height:0!important;min-height:0!important;background:transparent!important;}
 [data-testid="stToolbar"],[data-testid="stDecoration"],#MainMenu,footer{display:none!important;}
+/* Streamlit conserva el estado colapsado del panel entre recargas. El botón
+   nativo vive dentro del encabezado, que aquí se reduce a cero para copiar el
+   HTML de referencia; por eso debe tener una posición y un tamaño propios. */
+[data-testid="stExpandSidebarButton"]{
+  position:fixed!important;top:calc(var(--nav-h) + 8px)!important;left:8px!important;
+  z-index:120!important;display:flex!important;visibility:visible!important;
+  width:44px!important;height:44px!important;min-height:44px!important;
+  align-items:center!important;justify-content:center!important;opacity:1!important;
+  border:1px solid var(--azul-linea)!important;border-radius:50%!important;
+  background:#fff!important;color:var(--azul)!important;box-shadow:var(--portal-shadow)!important;
+}
 .block-container{max-width:none!important;padding:calc(var(--nav-h) - 30px) 14px 14px!important;}
 .block-container>div:first-child{gap:0!important;}
 .block-container [data-testid="stVerticalBlock"]{gap:10px;}

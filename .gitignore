@@ -2,6 +2,8 @@ __pycache__/
 *.py[cod]
 .streamlit/secrets.toml
 .venv/
+.audit_deps/
+.audit_streamlit163/
 uploads/
 *.zip
 *.log

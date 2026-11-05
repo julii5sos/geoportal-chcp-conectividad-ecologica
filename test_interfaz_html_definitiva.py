@@ -8,6 +8,7 @@ from interfaz_html_definitiva import (
     ConfiguracionAnalisis,
     stepper_html,
 )
+from portal_html import CSS_PORTAL_HTML
 
 
 class InterfazHtmlDefinitivaTests(unittest.TestCase):
@@ -58,6 +59,12 @@ class InterfazHtmlDefinitivaTests(unittest.TestCase):
         self.assertIn('href="?seccion=eri"', codigo)
         self.assertIn('["Capas", "Filtros", "Mapas base"]', codigo)
         self.assertNotIn("valor de demostración", codigo.lower())
+
+    def test_panel_lateral_colapsado_conserva_un_control_visible(self):
+        self.assertIn('[data-testid="stExpandSidebarButton"]', CSS_PORTAL_HTML)
+        self.assertIn("position:fixed!important", CSS_PORTAL_HTML)
+        self.assertIn("width:44px!important", CSS_PORTAL_HTML)
+        self.assertIn("height:44px!important", CSS_PORTAL_HTML)
 
 
 if __name__ == "__main__":

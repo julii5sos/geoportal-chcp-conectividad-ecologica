@@ -145,6 +145,9 @@ python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
+La versión auditada usa `streamlit==1.63.0`. Streamlit 1.66.1 bloqueó las pruebas
+`AppTest` de navegación y no debe utilizarse para esta versión candidata.
+
 ## Estado de publicación
 
 La rama principal de desarrollo es `main`. Todavía no existe un despliegue de
@@ -229,6 +232,13 @@ se presentan como coberturas anuales intercambiables.
 
 Consulte la [metodología y sus limitaciones](docs/METODOLOGIA_ANALISIS_TEMPORAL.md) y
 el [ejemplo reproducible JRC 2020–2025](docs/VALIDACION_JRC_2020_2025.md).
+
+## Auditoría de la versión candidata
+
+- [Informe general de Fase 5](docs/AUDITORIA_FINAL_FASE5.md)
+- [Auditoría de Sentinel-2 y Dynamic World](docs/AUDITORIA_COBERTURA_SENTINEL2.md)
+- [Validación de fragmentación y conectividad](docs/VALIDACION_FRAGMENTACION_CONECTIVIDAD.md)
+- [Verificación metodológica del ERI](docs/VERIFICACION_ERI.md)
 
 ## Rendimiento y límites prácticos
 
