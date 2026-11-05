@@ -1,4 +1,14 @@
-# Preevaluación territorial y corredores ecológicos de Panamá
+# Geoportal CHCP 2.0 · Conectividad ecológica
+
+Repositorio independiente del geoportal para la **Cuenca Hidrográfica del Canal
+de Panamá (CHCP)**. La aplicación integra evidencia satelital, cobertura forestal,
+fragmentación, conectividad estructural, corredores publicados y el Índice de
+Resiliencia Ecológica (ERI) para apoyar preevaluaciones territoriales reproducibles.
+
+El proyecto conserva el historial de desarrollo del visor original hasta la versión
+V2, pero desde este punto evoluciona de forma autónoma. No sustituye una evaluación
+de campo, no certifica cumplimiento normativo y no demuestra conectividad funcional
+o movimiento de especies.
 
 Aplicación Streamlit con tres rutas de trabajo independientes para que cada
 persona empiece por su pregunta y vea únicamente los controles necesarios:
@@ -17,7 +27,7 @@ La aplicación produce una **preevaluación indicativa**: ayuda a justificar por
 hallazgos en campo, no es una certificación, no determina cumplimiento EUDR y no
 demuestra por sí sola conectividad funcional para una especie.
 
-## Qué se añadió en este repositorio
+## Módulos científicos y funcionales
 
 - Navegación V2 entre **Inicio**, **Explorar**, **Comparar**, **Analizar**, **ERI**,
   **Resultados**, **Metodología y ayuda** y **Acerca del geoportal**. Las páginas
@@ -119,38 +129,29 @@ conectores, separaciones y componentes aislados.
 
 La procedencia de los GeoJSON incluidos se documenta en [THIRD_PARTY_DATA.md](THIRD_PARTY_DATA.md).
 
-## Ejecutar localmente
+## Instalación y ejecución local
 
 Requiere Python 3.11 o superior.
 
 ```powershell
+git clone https://github.com/julii5sos/geoportal-chcp-conectividad-ecologica.git
+cd geoportal-chcp-conectividad-ecologica
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Crear una nueva app en Streamlit Community Cloud
+## Estado de publicación
 
-El Geoportal CHCP 2.0 se mantiene separado de la aplicación estable en la rama
-`feature/geoportal-chcp-v2`. El ZIP aportado se utilizó únicamente
-como referencia de presentación; los cálculos y datos siguen siendo los de este
-repositorio. El ERI es complementario y no modifica la prioridad vigente. Para probar
-el modelo como una aplicación nueva sin modificar la actual:
+La rama principal de desarrollo es `main`. Todavía no existe un despliegue de
+producción autorizado para este repositorio. Cuando se apruebe una publicación,
+Streamlit Community Cloud deberá usar `main` y `app.py`, con los secretos configurados
+exclusivamente en la administración de la aplicación.
 
-1. En Streamlit Community Cloud elija **Create app**.
-2. Use el repositorio `julii5sos/julii5sos-evaluacion-corredores-panama`.
-3. En **Branch** seleccione `feature/geoportal-chcp-v2`.
-4. En **Main file path** escriba `app.py`.
-5. Elija un nombre distinto, por ejemplo `visor-chcp-eri`.
-6. Copie en **App settings > Secrets** los secretos de Earth Engine y verifique que la
-   cuenta de servicio tenga acceso al asset institucional de cobertura forestal. La
-   cuenca y las subcuencas ya viajan dentro de la aplicación.
-7. Despliegue y pruebe primero un polígono, la subcuenca Lago
-   Miraflores, un polígono recortado y cada una de las tres rutas de preevaluación.
-
-La aplicación estable continúa apuntando a `main`; publicar esta rama como una app
-nueva no reemplaza ni altera su URL.
+El archivo `conectividad_canal.zip` se utilizó como referencia de identidad visual.
+Los análisis científicos permanecen implementados en Python y Google Earth Engine;
+el ERI conserva su carácter complementario y no modifica la prioridad territorial.
 
 ## Configuración de Earth Engine
 
@@ -186,6 +187,7 @@ Desde ese momento, cada área seleccionada usa la misma fuente: la aplicación f
 
 ## Estructura principal
 
+- `app.py`: navegación y punto de entrada de Streamlit.
 - `app_experiencia.py`: interfaz cartográfica, motor Earth Engine e informe.
 - `portal_html.py`: encabezado, portada y composición visual copiados del HTML de referencia.
 - `geoportal_catalogo.py`: disponibilidad, versión y reglas temporales de las fuentes.
@@ -207,6 +209,17 @@ Desde ese momento, cada área seleccionada usa la misma fuente: la aplicación f
 ```powershell
 python -m unittest discover -v
 ```
+
+La línea base transferida cuenta con 85 pruebas unitarias y funcionales. Las pruebas
+de integración que consultan Earth Engine requieren credenciales autorizadas y acceso
+explícito a los assets privados correspondientes.
+
+## Próxima fase
+
+La siguiente fase implementará un motor temporal para calcular cobertura forestal,
+fragmentación y conectividad estructural de forma independiente para dos años válidos.
+Hasta que esa metodología esté implementada y validada, los selectores temporales del
+comparador no deben interpretarse como un recálculo de todos los indicadores científicos.
 
 ## Rendimiento y límites prácticos
 

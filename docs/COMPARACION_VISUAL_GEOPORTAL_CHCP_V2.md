@@ -2,9 +2,12 @@
 
 Fecha de verificación local: 4 de noviembre de 2026
 
-Rama: `feature/geoportal-chcp-v2`
+Rama de transferencia: `main` del repositorio independiente
 
-URL comprobada: `http://127.0.0.1:8510`
+URL de la comprobación visual documentada: `http://127.0.0.1:8510`
+
+Comprobación posterior a la transferencia: `http://127.0.0.1:8511` con respuesta
+`200 / ok` en el endpoint de salud de Streamlit.
 
 ## Referencias usadas
 
