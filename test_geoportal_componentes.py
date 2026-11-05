@@ -79,32 +79,45 @@ class ComponentesGeoportalTests(unittest.TestCase):
         app.run()
 
         self.assertFalse(app.exception)
+        abrir = next(
+            boton for boton in app.button if boton.label == "Realizar análisis"
+        )
+        abrir.click().run()
+        tipo = next(
+            selector for selector in app.radio if selector.label == "Tipo de análisis"
+        )
+        self.assertEqual(
+            tipo.options,
+            [
+                "Cobertura forestal",
+                "Fragmentación",
+                "Conectividad",
+                "Análisis integral",
+            ],
+        )
+        siguiente = next(boton for boton in app.button if boton.label == "Siguiente")
+        siguiente.click().run()
+        area = next(
+            selector for selector in app.radio if selector.label == "Área de interés"
+        )
+        self.assertEqual(
+            area.options,
+            ["Dibujar un polígono", "Seleccionar una subcuenca", "Toda la CHCP"],
+        )
+        next(boton for boton in app.button if boton.label == "Siguiente").click().run()
         fuente = next(
             selector for selector in app.selectbox if selector.label == "Fuente comparable"
         )
         self.assertEqual(
             fuente.options,
-            [
-                "JRC Tropical Moist Forest",
-                "ESRI Global Land Use / Land Cover",
-            ],
+            ["JRC Tropical Moist Forest", "ESRI Global Land Use / Land Cover"],
         )
-        inicial = next(
-            selector for selector in app.selectbox if selector.label == "Año inicial"
-        )
-        final = next(
-            selector for selector in app.selectbox if selector.label == "Año final"
-        )
+        inicial = next(selector for selector in app.selectbox if selector.label == "Año inicial")
+        final = next(selector for selector in app.selectbox if selector.label == "Año final")
         self.assertEqual(inicial.options[0], "1990")
         self.assertEqual(inicial.options[-1], "2024")
         self.assertEqual(final.options[-1], "2025")
         self.assertGreater(final.value, inicial.value)
-        ejecutar = next(
-            boton
-            for boton in app.button
-            if boton.label == "Calcular comparación científica"
-        )
-        self.assertTrue(ejecutar.disabled)
 
     def test_resultados_no_inventa_indicadores_antes_del_analisis(self):
         app = AppTest.from_file("app.py", default_timeout=60)

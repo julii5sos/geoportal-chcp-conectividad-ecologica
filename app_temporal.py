@@ -29,6 +29,14 @@ from territorio_local import (
     geometria_subcuenca,
     nombres_subcuencas,
 )
+from interfaz_html_definitiva import (
+    CSS_FASE4,
+    TIPOS_ANALISIS,
+    UNIDADES_ANALISIS,
+    construir_configuracion,
+    configurar_asistente_inicial,
+    stepper_html,
+)
 
 
 AZUL = "#0A4393"
@@ -413,295 +421,365 @@ def preparar_descarga_zip(resultado: dict) -> bytes:
     return memoria.getvalue()
 
 
-st.markdown(
-    """
-    <section class="temporal-cabecera">
-      <div><small>Cuenca Hidrográfica del Canal de Panamá</small>
-      <h1>Análisis ecológico temporal</h1></div>
-      <div class="temporal-sello">Recálculo científico por período</div>
-    </section>
-    """,
-    unsafe_allow_html=True,
-)
-st.markdown(
-    """
-    <div class="temporal-nota"><b>Comparación válida:</b> cada año genera una cobertura
-    bosque/no bosque independiente y vuelve a calcular parches y red con los mismos
-    parámetros. JRC y ESRI usan definiciones distintas y nunca se combinan.</div>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown(CSS_FASE4, unsafe_allow_html=True)
+st.markdown('<div class="fase4-plataforma" aria-hidden="true"></div>', unsafe_allow_html=True)
+configurar_asistente_inicial()
 
-tab_fuente, tab_filtros, tab_base = st.sidebar.tabs(["Fuente", "Filtros", "Mapa base"])
-fuente = tab_fuente.selectbox(
-    "Fuente comparable",
-    list(FUENTES_TEMPORALES),
-    format_func=lambda clave: FUENTES_TEMPORALES[clave].nombre,
-    help="JRC TMF es la fuente principal. ESRI se ejecuta como alternativa independiente.",
-)
-especificacion = FUENTES_TEMPORALES[fuente]
-tab_fuente.markdown(f"**{especificacion.prioridad} · {especificacion.resolucion_m} m**")
-tab_fuente.caption(especificacion.definicion_bosque)
-tab_fuente.warning(especificacion.limitacion)
 
-unidad = tab_filtros.selectbox(
-    "Unidad territorial",
-    ["Dibujar polígono", "Seleccionar subcuenca"],
-    help="El polígono se recorta automáticamente al límite local de la CHCP.",
-)
-subcuenca = None
-if unidad == "Seleccionar subcuenca":
-    subcuenca = tab_filtros.selectbox("Subcuenca", nombres_subcuencas())
+def _normalizar_anios(fuente: str) -> tuple[list[int], list[int]]:
+    disponibles = list(FUENTES_TEMPORALES[fuente].anios)
+    iniciales = disponibles[:-1]
+    inicial = st.session_state.get("fase4_anio_inicial", 2020)
+    if inicial not in iniciales:
+        inicial = 2020 if 2020 in iniciales else iniciales[0]
+        st.session_state["fase4_anio_inicial"] = inicial
+    finales = [anio for anio in disponibles if anio > inicial]
+    final = st.session_state.get("fase4_anio_final", 2025)
+    if final not in finales:
+        st.session_state["fase4_anio_final"] = finales[-1]
+    return iniciales, finales
 
-opciones_iniciales = list(especificacion.anios[:-1])
-indice_2020 = opciones_iniciales.index(2020) if 2020 in opciones_iniciales else 0
-anio_inicial = tab_filtros.selectbox(
-    "Año inicial",
-    opciones_iniciales,
-    index=indice_2020,
-)
-opciones_finales = [anio for anio in especificacion.anios if anio > anio_inicial]
-anio_final = tab_filtros.selectbox(
-    "Año final",
-    opciones_finales,
-    index=len(opciones_finales) - 1,
-)
 
-with tab_filtros.expander("Parámetros equivalentes", expanded=False):
-    distancia_maxima_m = st.select_slider(
-        "Distancia máxima entre parches",
-        options=[100, 250, 500, 1000, 1500, 3000],
-        value=500,
-        format_func=lambda valor: f"{valor:,} m",
-        help="Se aplica exactamente el mismo umbral a ambos años.",
-    )
-    area_minima_parche_ha = st.number_input(
-        "Área mínima de parche (ha)",
-        min_value=0.0,
-        value=0.1,
-        step=0.1,
-        help="Filtra componentes pequeños antes de transferirlos desde Earth Engine.",
-    )
+@st.dialog("Realizar análisis", width="large")
+def mostrar_asistente_fase4() -> None:
+    """Asistente de cuatro pasos conectado a la configuración científica real."""
 
-mapa_base = tab_base.selectbox("Fondo cartográfico", list(MAPAS_BASE), index=0)
-tab_base.caption("El fondo solo cambia la visualización; nunca modifica las métricas.")
+    paso = int(st.session_state.get("fase4_paso", 1))
+    lateral, contenido = st.columns([0.25, 0.75], gap="medium")
+    with lateral:
+        st.markdown(stepper_html(paso), unsafe_allow_html=True)
 
-if unidad == "Seleccionar subcuenca":
-    # Algunas geometrías fuente tocan o sobrepasan mínimamente el límite general.
-    # El motor siempre recibe exactamente la porción válida dentro de la CHCP.
-    area_geojson = recortar_area_a_cuenca(
-        geometria_subcuenca(subcuenca),
-        geometria_cuenca(),
-    )
-    st.markdown('<div class="temporal-subtitulo">Área seleccionada</div>', unsafe_allow_html=True)
-    mapa_area = folium.Map(location=[8.75, -79.75], zoom_start=9, tiles=None, control_scale=True)
-    _agregar_base(mapa_area, mapa_base)
-    folium.GeoJson(
-        coleccion_subcuencas(),
-        name="Subcuencas",
-        style_function=lambda _: {"color": "#8CA0BA", "weight": 1, "fillOpacity": 0.02},
-    ).add_to(mapa_area)
-    folium.GeoJson(
-        area_geojson,
-        name=subcuenca,
-        style_function=lambda _: {
-            "color": "#55D8FF",
-            "weight": 4,
-            "fillColor": "#55D8FF",
-            "fillOpacity": 0.08,
-        },
-    ).add_to(mapa_area)
-    mapa_area.fit_bounds(_limites_geojson(area_geojson))
-    st_folium(
-        mapa_area,
-        height=610,
-        use_container_width=True,
-        returned_objects=[],
-        key=f"area-subcuenca-{subcuenca}-{mapa_base}",
-    )
-else:
-    st.markdown('<div class="temporal-subtitulo">Dibuje el área dentro de la CHCP</div>', unsafe_allow_html=True)
-    st.caption("Use la herramienta de polígono. Las partes exteriores se excluyen automáticamente.")
-    area_json = mostrar_selector_dibujo(mapa_base)
-    area_geojson = json.loads(area_json) if area_json else None
-    if area_json and st.button("Borrar polígono", key="borrar-area-temporal"):
-        st.session_state.pop("area_temporal_dibujada", None)
-        st.session_state.pop("resultado_temporal", None)
-        st.session_state["version_dibujo_temporal"] = (
-            st.session_state.get("version_dibujo_temporal", 0) + 1
+    with contenido:
+        if paso == 1:
+            st.markdown('<div class="fase4-wizard-title">Seleccione el análisis</div>', unsafe_allow_html=True)
+            st.markdown('<p class="fase4-wizard-help">Cada opción utiliza resultados científicos del motor temporal; no son botones de demostración.</p>', unsafe_allow_html=True)
+            tipo_actual = st.session_state.get("fase4_tipo", "integral")
+            tipo_elegido = st.radio(
+                "Tipo de análisis",
+                list(TIPOS_ANALISIS),
+                format_func=lambda clave: TIPOS_ANALISIS[clave]["titulo"],
+                captions=[TIPOS_ANALISIS[clave]["descripcion"] for clave in TIPOS_ANALISIS],
+                index=list(TIPOS_ANALISIS).index(tipo_actual),
+                key="fase4_widget_tipo",
+                label_visibility="collapsed",
+            )
+            st.session_state["fase4_tipo"] = tipo_elegido
+        elif paso == 2:
+            st.markdown('<div class="fase4-wizard-title">Defina el área de interés</div>', unsafe_allow_html=True)
+            st.markdown('<p class="fase4-wizard-help">El dibujo es la primera opción. Toda geometría se recorta al límite local de la CHCP antes de calcular.</p>', unsafe_allow_html=True)
+            unidad_actual = st.session_state.get("fase4_unidad", "dibujo")
+            unidad_elegida = st.radio(
+                "Área de interés",
+                list(UNIDADES_ANALISIS),
+                format_func=lambda clave: UNIDADES_ANALISIS[clave],
+                index=list(UNIDADES_ANALISIS).index(unidad_actual),
+                key="fase4_widget_unidad",
+                label_visibility="collapsed",
+            )
+            st.session_state["fase4_unidad"] = unidad_elegida
+            if unidad_elegida == "subcuenca":
+                st.selectbox("Subcuenca", nombres_subcuencas(), key="fase4_subcuenca")
+        elif paso == 3:
+            st.markdown('<div class="fase4-wizard-title">Configure fuente y criterios</div>', unsafe_allow_html=True)
+            st.markdown('<p class="fase4-wizard-help">JRC TMF y ESRI permanecen separados. Los mismos parámetros se aplican a ambos años.</p>', unsafe_allow_html=True)
+            fuente_actual = st.session_state.get("fase4_fuente", "jrc_tmf")
+            fuente_elegida = st.selectbox(
+                "Fuente comparable",
+                list(FUENTES_TEMPORALES),
+                format_func=lambda clave: FUENTES_TEMPORALES[clave].nombre,
+                index=list(FUENTES_TEMPORALES).index(fuente_actual),
+                key="fase4_widget_fuente",
+            )
+            st.session_state["fase4_fuente"] = fuente_elegida
+            iniciales, finales = _normalizar_anios(fuente_elegida)
+            c1, c2 = st.columns(2)
+            inicial_actual = st.session_state.get("fase4_anio_inicial", 2020)
+            inicial_elegido = c1.selectbox(
+                "Año inicial",
+                iniciales,
+                index=iniciales.index(inicial_actual),
+                key=f"fase4_widget_inicial_{fuente_elegida}",
+            )
+            st.session_state["fase4_anio_inicial"] = inicial_elegido
+            finales = [anio for anio in FUENTES_TEMPORALES[fuente_elegida].anios if anio > inicial_elegido]
+            final_actual = st.session_state.get("fase4_anio_final", finales[-1])
+            if final_actual not in finales:
+                final_actual = finales[-1]
+            final_elegido = c2.selectbox(
+                "Año final",
+                finales,
+                index=finales.index(final_actual),
+                key=f"fase4_widget_final_{fuente_elegida}_{inicial_elegido}",
+            )
+            st.session_state["fase4_anio_final"] = final_elegido
+            distancia_elegida = st.select_slider(
+                "Distancia máxima entre parches",
+                options=[100, 250, 500, 1000, 1500, 3000],
+                value=st.session_state.get("fase4_distancia", 500),
+                format_func=lambda valor: f"{valor:,} m",
+                key="fase4_widget_distancia",
+            )
+            st.session_state["fase4_distancia"] = distancia_elegida
+            area_minima_elegida = st.number_input(
+                "Área mínima de parche (ha)",
+                min_value=0.0,
+                value=float(st.session_state.get("fase4_area_minima", 0.1)),
+                step=0.1,
+                key="fase4_widget_area_minima",
+            )
+            st.session_state["fase4_area_minima"] = area_minima_elegida
+        else:
+            _normalizar_anios(st.session_state["fase4_fuente"])
+            config = construir_configuracion()
+            especificacion = FUENTES_TEMPORALES[config.fuente]
+            st.markdown('<div class="fase4-wizard-title">Revise la solicitud</div>', unsafe_allow_html=True)
+            st.markdown('<p class="fase4-wizard-help">La ejecución recuperará dos coberturas independientes y recalculará fragmentación y red para cada período.</p>', unsafe_allow_html=True)
+            st.markdown(
+                f"""<div class="fase4-review">
+                <div><small>Análisis</small><b>{TIPOS_ANALISIS[config.tipo]['titulo']}</b></div>
+                <div><small>Área</small><b>{UNIDADES_ANALISIS[config.unidad]}</b></div>
+                <div><small>Fuente</small><b>{especificacion.nombre}</b></div>
+                <div><small>Período</small><b>{config.anio_inicial}–{config.anio_final}</b></div>
+                <div><small>Distancia</small><b>{config.distancia_maxima_m:,.0f} m</b></div>
+                <div><small>Resolución</small><b>{especificacion.resolucion_m} m</b></div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+            st.warning("El ERI conserva su metodología original y se consulta como evaluación complementaria; no se convierte en índice anual.")
+
+    atras, siguiente = st.columns(2)
+    if paso > 1 and atras.button("Atrás", use_container_width=True):
+        st.session_state["fase4_paso"] = paso - 1
+        st.rerun()
+    if paso < 4:
+        if siguiente.button("Siguiente", type="primary", use_container_width=True):
+            st.session_state["fase4_paso"] = paso + 1
+            st.rerun()
+    else:
+        if siguiente.button("Aplicar configuración", type="primary", use_container_width=True):
+            st.session_state["configuracion_temporal_fase4"] = construir_configuracion()
+            st.session_state["fase4_asistente_abierto"] = False
+            st.session_state["fase4_paso"] = 1
+            st.rerun()
+
+
+if "fase4_anio_inicial" not in st.session_state:
+    st.session_state["fase4_anio_inicial"] = 2020
+if "fase4_anio_final" not in st.session_state:
+    st.session_state["fase4_anio_final"] = 2025
+_normalizar_anios(st.session_state["fase4_fuente"])
+configuracion = st.session_state.get("configuracion_temporal_fase4")
+if configuracion is None:
+    configuracion = construir_configuracion()
+
+tab_capas, tab_filtros, tab_base = st.sidebar.tabs(["Capas", "Filtros", "Mapas base"])
+with tab_capas:
+    st.markdown('<div class="fase4-marca-seccion"><small>Explorador</small><strong>Capas disponibles</strong></div>', unsafe_allow_html=True)
+    with st.expander("Límites", expanded=True):
+        mostrar_limite = st.checkbox("Cuenca hidrográfica", value=True, key="fase4_limite")
+        mostrar_subcuencas = st.checkbox("Subcuencas del Canal", value=True, key="fase4_subcuencas")
+        st.markdown('<div class="fase4-grupo-meta"><span>Territorio local</span><span class="fase4-tag">Real</span></div>', unsafe_allow_html=True)
+    with st.expander("Cobertura forestal", expanded=True):
+        fuente_vista = st.radio(
+            "Fuente visible",
+            list(FUENTES_TEMPORALES),
+            format_func=lambda clave: FUENTES_TEMPORALES[clave].nombre,
+            index=list(FUENTES_TEMPORALES).index(configuracion.fuente),
+            disabled=True,
+            help="La fuente visible corresponde a la configuración científica activa.",
         )
+        st.markdown(f'<div class="fase4-grupo-meta"><span>{FUENTES_TEMPORALES[fuente_vista].resolucion_m} m</span><span class="fase4-tag">Real</span></div>', unsafe_allow_html=True)
+    with st.expander("Fragmentación", expanded=False):
+        st.checkbox("Parches forestales", value=True, disabled=True)
+        st.checkbox("Parches aislados", value=True, disabled=True)
+    with st.expander("Conectividad", expanded=False):
+        st.checkbox("Red entre parches", value=True, disabled=True)
+        st.checkbox("Componentes de conectividad", value=True, disabled=True)
+    with st.expander("ERI complementario", expanded=False):
+        st.caption("Integridad, conectividad local, estabilidad topográfica y proximidad riparia. No altera la comparación temporal.")
+        st.markdown('<a href="?seccion=eri" target="_self">Abrir evaluación ERI</a>', unsafe_allow_html=True)
+
+with tab_filtros:
+    st.markdown("### Configuración activa")
+    st.caption(f"{TIPOS_ANALISIS[configuracion.tipo]['titulo']} · {UNIDADES_ANALISIS[configuracion.unidad]}")
+    st.caption(f"{FUENTES_TEMPORALES[configuracion.fuente].nombre} · {configuracion.anio_inicial}–{configuracion.anio_final}")
+    st.caption(f"Distancia entre parches: {configuracion.distancia_maxima_m:,.0f} m")
+    if st.button("Cambiar criterios", use_container_width=True):
+        st.session_state["fase4_asistente_abierto"] = True
         st.rerun()
 
-firma = (
-    fuente,
-    anio_inicial,
-    anio_final,
-    json.dumps(area_geojson, sort_keys=True) if area_geojson else None,
-    distancia_maxima_m,
-    area_minima_parche_ha,
-)
-resultado_actual = st.session_state.get("firma_temporal") == firma
+mapa_base = tab_base.radio("Fondo cartográfico", list(MAPAS_BASE), index=0)
+tab_base.caption("El mapa base solo cambia la visualización y nunca modifica las métricas.")
 
-ejecutar = st.sidebar.button(
-    "Calcular comparación científica",
-    type="primary",
-    width="stretch",
-    disabled=area_geojson is None,
-    help="Recupera ambas coberturas y recalcula fragmentación y conectividad.",
-)
-if area_geojson is None:
-    st.sidebar.info("Dibuje un polígono para habilitar el cálculo.")
+area_geojson = None
+area_json = None
+if configuracion.unidad == "subcuenca":
+    nombre_subcuenca = configuracion.subcuenca or nombres_subcuencas()[0]
+    area_geojson = recortar_area_a_cuenca(geometria_subcuenca(nombre_subcuenca), geometria_cuenca())
+elif configuracion.unidad == "cuenca":
+    area_geojson = geometria_cuenca()
 
-if ejecutar:
-    with st.status("Preparando el análisis temporal...", expanded=True) as estado:
-        try:
-            estado.write(f"Recuperando cobertura {especificacion.nombre} de {anio_inicial}.")
-            estado.write(f"Recuperando cobertura {especificacion.nombre} de {anio_final}.")
-            estado.write("Vectorizando parches y calculando dos redes equivalentes.")
-            resultado = ejecutar_temporal_cache(
-                fuente,
-                anio_inicial,
-                anio_final,
-                json.dumps(area_geojson, ensure_ascii=False, sort_keys=True),
-                distancia_maxima_m,
-                area_minima_parche_ha,
-            )
-            st.session_state["resultado_temporal"] = resultado
-            st.session_state["firma_temporal"] = firma
-            estado.update(label="Comparación científica lista", state="complete", expanded=False)
-            st.rerun()
-        except Exception as error:
-            estado.update(label="No fue posible completar la comparación", state="error")
-            st.error(
-                "El motor no pudo recuperar o vectorizar una de las coberturas. "
-                "No se generaron valores sustitutos ni resultados ficticios."
-            )
-            with st.expander("Detalle técnico para soporte", expanded=False):
-                st.code(f"{type(error).__name__}: {error}")
+if area_geojson is not None:
+    area_json = json.dumps(area_geojson, ensure_ascii=False, sort_keys=True)
 
-if not resultado_actual:
-    if st.session_state.get("resultado_temporal"):
-        st.warning("Cambió el área, la fuente, los años o los parámetros. Ejecute nuevamente.")
+resultado = st.session_state.get("resultado_temporal")
+firma = configuracion.firma(area_json or st.session_state.get("area_temporal_dibujada"))
+resultado_actual = resultado is not None and st.session_state.get("firma_temporal") == firma
+descarga_zip = preparar_descarga_zip(resultado) if resultado_actual else None
+
+acciones = st.sidebar.container(key="acciones_sidebar")
+if "configuracion_temporal_fase4" not in st.session_state:
+    if acciones.button("Realizar análisis", type="primary", use_container_width=True):
+        st.session_state["fase4_asistente_abierto"] = True
+        st.rerun()
+    ejecutar = False
+else:
+    if acciones.button(
+        "Ejecutar análisis",
+        type="primary",
+        use_container_width=True,
+        disabled=configuracion.unidad == "dibujo" and not st.session_state.get("area_temporal_dibujada"),
+    ):
+        ejecutar = True
     else:
-        st.info(
-            "Seleccione el área y ejecute el análisis. Antes de calcular no se muestran "
-            "estadísticas de demostración."
+        ejecutar = False
+    if descarga_zip is not None:
+        acciones.download_button(
+            "Descargas",
+            data=descarga_zip,
+            file_name=f"analisis_temporal_{configuracion.fuente}_{configuracion.anio_inicial}_{configuracion.anio_final}.zip",
+            mime="application/zip",
+            use_container_width=True,
         )
-    st.stop()
 
-resultado = st.session_state["resultado_temporal"]
-resumen_i = resultado["periodos"][str(anio_inicial)]["resumen"]
-resumen_f = resultado["periodos"][str(anio_final)]["resumen"]
-cambios = resultado["cambios"]
+if st.session_state.get("fase4_asistente_abierto"):
+    mostrar_asistente_fase4()
 
-st.markdown("## Resultado comparativo")
-c1, c2, c3, c4 = st.columns(4)
-c1.metric(
-    "Superficie forestal",
-    f"{resumen_f['superficie_bosque_ha']:,.2f} ha",
-    f"{cambios['superficie_bosque_ha']:+,.2f} ha",
-    delta_color="normal",
-)
-c2.metric(
-    "Número de parches",
-    f"{resumen_f['numero_parches']:,}",
-    f"{cambios['numero_parches']:+,.0f}",
-    delta_color="inverse",
-)
-c3.metric(
-    "Parches aislados",
-    f"{resumen_f['parches_aislados']:,}",
-    f"{cambios['parches_aislados']:+,.0f}",
-    delta_color="inverse",
-)
-c4.metric(
-    "Componentes de red",
-    f"{resumen_f['numero_componentes']:,}",
-    f"{cambios['numero_componentes']:+,.0f}",
-    delta_color="inverse",
+st.markdown(
+    f"""<div class="fase4-topline"><div><strong>Panel de cuencas · Conectividad Panamá</strong>
+    <p>Explorador científico de cobertura, fragmentación y conectividad estructural.</p></div>
+    <span class="fase4-periodo">{configuracion.anio_inicial}–{configuracion.anio_final} · {FUENTES_TEMPORALES[configuracion.fuente].resolucion_m} m</span></div>""",
+    unsafe_allow_html=True,
 )
 
-transiciones = resultado["transiciones"]
-t1, t2, t3 = st.columns(3)
-t1.metric("Bosque estable", f"{transiciones['bosque_estable']['area_ha']:,.2f} ha")
-t2.metric("Pérdida de bosque", f"{transiciones['perdida_bosque']['area_ha']:,.2f} ha")
-t3.metric("Ganancia de bosque", f"{transiciones['ganancia_bosque']['area_ha']:,.2f} ha")
+col_mapa, col_resultado = st.columns([3.55, 1.35], gap=None)
+with col_mapa:
+    with st.container(key="fase4_mapa_central"):
+        if configuracion.unidad == "dibujo" and not resultado_actual:
+            area_json_dibujo = mostrar_selector_dibujo(mapa_base)
+            if area_json_dibujo:
+                area_json = area_json_dibujo
+                area_geojson = json.loads(area_json_dibujo)
+                firma = configuracion.firma(area_json)
+        elif resultado_actual:
+            capa_resultado = tab_capas.radio(
+                "Vista del resultado",
+                ["Transiciones", str(configuracion.anio_inicial), str(configuracion.anio_final)],
+                horizontal=False,
+            )
+            if capa_resultado == "Transiciones":
+                mapa_resultado = crear_mapa_transiciones(resultado, mapa_base)
+            else:
+                mapa_resultado = crear_mapa_periodo(resultado, int(capa_resultado), mapa_base)
+            if mostrar_limite:
+                folium.GeoJson(coleccion_cuenca(), name="Límite CHCP", style_function=lambda _: {"color": "#0A4393", "weight": 2.5, "fillOpacity": 0}).add_to(mapa_resultado)
+            if mostrar_subcuencas:
+                folium.GeoJson(coleccion_subcuencas(), name="Subcuencas", style_function=lambda _: {"color": "#77CC09", "weight": 1, "fillOpacity": 0}).add_to(mapa_resultado)
+            st_folium(mapa_resultado, height=720, use_container_width=True, returned_objects=[], key=f"fase4-resultado-{capa_resultado}-{hash(firma)}")
+        else:
+            mapa_area = folium.Map(location=[9.1, -79.7], zoom_start=9, tiles=None, control_scale=True)
+            _agregar_base(mapa_area, mapa_base)
+            if mostrar_limite:
+                folium.GeoJson(coleccion_cuenca(), name="Límite CHCP", style_function=lambda _: {"color": "#0A4393", "weight": 3, "fillOpacity": 0.03}).add_to(mapa_area)
+            if mostrar_subcuencas:
+                folium.GeoJson(coleccion_subcuencas(), name="Subcuencas", style_function=lambda _: {"color": "#77CC09", "weight": 1, "fillOpacity": 0}).add_to(mapa_area)
+            if area_geojson:
+                folium.GeoJson(area_geojson, name="Área seleccionada", style_function=lambda _: {"color": "#FABC20", "weight": 4, "fillColor": "#FABC20", "fillOpacity": .12}).add_to(mapa_area)
+                mapa_area.fit_bounds(_limites_geojson(area_geojson))
+            st_folium(mapa_area, height=720, use_container_width=True, returned_objects=[], key=f"fase4-area-{configuracion.unidad}-{configuracion.subcuenca}-{mapa_base}")
 
-tab_cambio, tab_inicial, tab_final = st.tabs(
-    [f"Cambios {anio_inicial}–{anio_final}", str(anio_inicial), str(anio_final)]
-)
-with tab_cambio:
-    st_folium(
-        crear_mapa_transiciones(resultado, mapa_base),
-        height=660,
-        use_container_width=True,
-        returned_objects=[],
-        key=f"mapa-transiciones-{hash(firma)}",
-    )
-with tab_inicial:
-    st_folium(
-        crear_mapa_periodo(resultado, anio_inicial, mapa_base),
-        height=660,
-        use_container_width=True,
-        returned_objects=[],
-        key=f"mapa-periodo-{anio_inicial}-{hash(firma)}",
-    )
-with tab_final:
-    st_folium(
-        crear_mapa_periodo(resultado, anio_final, mapa_base),
-        height=660,
-        use_container_width=True,
-        returned_objects=[],
-        key=f"mapa-periodo-{anio_final}-{hash(firma)}",
-    )
-
-valores = [
-    {
-        "Año": str(anio),
-        "Bosque (ha)": resultado["periodos"][str(anio)]["resumen"]["superficie_bosque_ha"],
-        "Parches": resultado["periodos"][str(anio)]["resumen"]["numero_parches"],
-        "Parches aislados": resultado["periodos"][str(anio)]["resumen"]["parches_aislados"],
-        "Componentes": resultado["periodos"][str(anio)]["resumen"]["numero_componentes"],
-    }
-    for anio in (anio_inicial, anio_final)
-]
-g1, g2 = st.columns(2)
-with g1:
-    st.markdown("### Superficie de bosque")
-    st.altair_chart(
-        _grafica_barras(
-            valores,
-            "Bosque (ha)",
-            "Superficie forestal (ha)",
-            JRC if fuente == "jrc_tmf" else ESRI,
-        ),
-        width="stretch",
-        theme=None,
-    )
-with g2:
-    st.markdown("### Fragmentación y conectividad")
-    st.altair_chart(_grafica_red(valores), width="stretch", theme=None)
-
-with st.expander("Tabla comparativa y método", expanded=False):
-    st.dataframe(valores, hide_index=True, width="stretch")
+with col_resultado:
     st.markdown(
-        f"""
-        <div class="temporal-metodo"><b>Fuente:</b> {especificacion.nombre} ·
-        {especificacion.version} · {especificacion.resolucion_m} m.<br>
-        <b>Definición:</b> {especificacion.definicion_bosque}<br>
-        <b>Red:</b> misma distancia máxima de {distancia_maxima_m:,.0f} m y área mínima
-        de {area_minima_parche_ha:.2f} ha en ambos años.<br>
-        <b>Alcance:</b> conectividad estructural potencial; no demuestra conectividad
-        funcional ni movimiento de fauna.</div>
-        """,
+        f"""<div class="fase4-res-h"><small>Estadísticas</small><h2>{TIPOS_ANALISIS[configuracion.tipo]['titulo']}</h2>
+        <p>{configuracion.anio_inicial}–{configuracion.anio_final} · {FUENTES_TEMPORALES[configuracion.fuente].nombre}</p></div>""",
         unsafe_allow_html=True,
     )
+    if not resultado_actual:
+        st.markdown(
+            """<div class="fase4-res-body"><div class="fase4-estado-vacio"><div>
+            <h2>Prepare el análisis</h2><p>Seleccione los criterios, defina el área y ejecute el cálculo. No se muestran indicadores ficticios antes de procesar.</p>
+            </div></div></div>""",
+            unsafe_allow_html=True,
+        )
+    else:
+        resumen_i = resultado["periodos"][str(configuracion.anio_inicial)]["resumen"]
+        resumen_f = resultado["periodos"][str(configuracion.anio_final)]["resumen"]
+        cambios = resultado["cambios"]
+        transiciones = resultado["transiciones"]
+        clase_delta = "fase4-delta-pos" if cambios["superficie_bosque_ha"] >= 0 else "fase4-delta-neg"
+        st.markdown(
+            f"""<div class="fase4-res-body">
+            <div class="fase4-big"><small>Superficie forestal {configuracion.anio_final}</small><strong>{resumen_f['superficie_bosque_ha']:,.1f} ha</strong><span class="{clase_delta}">{cambios['superficie_bosque_ha']:+,.1f} ha</span></div>
+            <div class="fase4-cards">
+              <div class="fase4-mc"><small>Parches</small><strong>{resumen_f['numero_parches']:,}</strong></div>
+              <div class="fase4-mc"><small>Aislados</small><strong>{resumen_f['parches_aislados']:,}</strong></div>
+              <div class="fase4-mc"><small>Componentes</small><strong>{resumen_f['numero_componentes']:,}</strong></div>
+              <div class="fase4-mc"><small>Pérdida</small><strong>{transiciones['perdida_bosque']['area_ha']:,.1f} ha</strong></div>
+            </div></div>""",
+            unsafe_allow_html=True,
+        )
+        valores = [
+            {"Año": str(anio), "Bosque (ha)": resultado["periodos"][str(anio)]["resumen"]["superficie_bosque_ha"], "Parches": resultado["periodos"][str(anio)]["resumen"]["numero_parches"], "Parches aislados": resultado["periodos"][str(anio)]["resumen"]["parches_aislados"], "Componentes": resultado["periodos"][str(anio)]["resumen"]["numero_componentes"]}
+            for anio in (configuracion.anio_inicial, configuracion.anio_final)
+        ]
+        st.markdown('<div class="fase4-chart-title">Comparación entre períodos</div>', unsafe_allow_html=True)
+        if configuracion.tipo == "cobertura":
+            grafica = _grafica_barras(valores, "Bosque (ha)", "Superficie forestal (ha)", JRC if configuracion.fuente == "jrc_tmf" else ESRI)
+        else:
+            grafica = _grafica_red(valores)
+        st.altair_chart(grafica, width="stretch", theme=None)
+        st.markdown('<div class="fase4-warning">Conectividad estructural potencial. Los resultados requieren interpretación y no demuestran movimiento de fauna.</div>', unsafe_allow_html=True)
+        with st.expander("Método y valores", expanded=False):
+            st.dataframe(valores, hide_index=True, width="stretch")
+            especificacion = FUENTES_TEMPORALES[configuracion.fuente]
+            st.caption(f"{especificacion.version} · {especificacion.resolucion_m} m. {especificacion.definicion_bosque}")
+        st.download_button(
+            "Descargar resultados",
+            data=descarga_zip,
+            file_name=f"analisis_temporal_{configuracion.fuente}_{configuracion.anio_inicial}_{configuracion.anio_final}.zip",
+            mime="application/zip",
+            type="primary",
+            use_container_width=True,
+        )
 
-st.download_button(
-    "Descargar resultados, GeoJSON y metadatos",
-    data=preparar_descarga_zip(resultado),
-    file_name=f"analisis_temporal_{fuente}_{anio_inicial}_{anio_final}.zip",
-    mime="application/zip",
-    type="primary",
-    width="stretch",
-)
+if ejecutar:
+    if configuracion.unidad == "dibujo":
+        area_json = st.session_state.get("area_temporal_dibujada")
+        area_geojson = json.loads(area_json) if area_json else None
+    if area_geojson is None:
+        st.warning("Dibuje un polígono antes de ejecutar el análisis.")
+    else:
+        area_json = json.dumps(area_geojson, ensure_ascii=False, sort_keys=True)
+        firma = configuracion.firma(area_json)
+        with st.status("Procesando el análisis científico...", expanded=True) as estado:
+            try:
+                estado.write(f"Recuperando {FUENTES_TEMPORALES[configuracion.fuente].nombre} para {configuracion.anio_inicial} y {configuracion.anio_final}.")
+                estado.write("Vectorizando parches con parámetros equivalentes.")
+                estado.write("Calculando redes, transiciones y estadísticas.")
+                resultado_nuevo = ejecutar_temporal_cache(
+                    configuracion.fuente,
+                    configuracion.anio_inicial,
+                    configuracion.anio_final,
+                    area_json,
+                    configuracion.distancia_maxima_m,
+                    configuracion.area_minima_parche_ha,
+                )
+                st.session_state["resultado_temporal"] = resultado_nuevo
+                st.session_state["firma_temporal"] = firma
+                estado.update(label="Análisis científico listo", state="complete", expanded=False)
+                st.rerun()
+            except Exception as error:
+                estado.update(label="No fue posible completar el análisis", state="error")
+                st.error("No se generaron valores sustitutos ni resultados ficticios.")
+                with st.expander("Detalle técnico para soporte"):
+                    st.code(f"{type(error).__name__}: {error}")

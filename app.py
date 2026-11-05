@@ -3,7 +3,9 @@
 import runpy
 from pathlib import Path
 
+import folium
 import streamlit as st
+from streamlit_folium import st_folium
 
 from eri_indicativo import PESOS_ERI
 from geoportal_catalogo import filas_catalogo
@@ -20,6 +22,7 @@ from portal_html import (
     mostrar_hero_inicio,
     mostrar_navegacion_portal,
 )
+from territorio_local import coleccion_cuenca, coleccion_subcuencas
 
 
 st.set_page_config(
@@ -161,6 +164,64 @@ inyectar_estilo_portal()
 
 def mostrar_cabecera_portal(seccion=SECCION_INICIO):
     mostrar_navegacion_portal(seccion)
+
+
+def mostrar_resumen_territorial_inicio():
+    """Resumen local verificable inspirado en la portada del panel original."""
+
+    subcuencas = coleccion_subcuencas()
+    numero_subcuencas = len(subcuencas.get("features", []))
+    texto, mapa_col = st.columns([0.9, 1.1], gap=None)
+    with texto:
+        st.markdown(
+            f"""<section class="ref-panel-resumen"><small>Panel territorial</small>
+            <h2>Cuenca Hidrográfica del Canal de Panamá</h2>
+            <p>Explore el límite oficial incorporado al proyecto y sus {numero_subcuencas} unidades locales antes de iniciar un análisis científico.</p>
+            <div class="ref-panel-datos"><div><span>Territorio</span><b>CHCP</b></div>
+            <div><span>Subcuencas disponibles</span><b>{numero_subcuencas}</b></div>
+            <div><span>Geometrías</span><b>Locales · WGS 84</b></div></div>
+            <a class="ref-btn ref-btn-w" href="?seccion=explorar" target="_self">Abrir plataforma</a>
+            </section>""",
+            unsafe_allow_html=True,
+        )
+    with mapa_col:
+        mapa = folium.Map(
+            location=[9.1, -79.7],
+            zoom_start=9,
+            tiles=None,
+            control_scale=True,
+            prefer_canvas=True,
+        )
+        folium.TileLayer(
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri Light Gray Canvas",
+            control=False,
+        ).add_to(mapa)
+        folium.GeoJson(
+            coleccion_cuenca(),
+            style_function=lambda _: {
+                "color": "#0A4393",
+                "weight": 3,
+                "fillColor": "#0A4393",
+                "fillOpacity": 0.08,
+            },
+        ).add_to(mapa)
+        folium.GeoJson(
+            subcuencas,
+            style_function=lambda _: {
+                "color": "#77CC09",
+                "weight": 1,
+                "fillOpacity": 0,
+            },
+            tooltip=folium.GeoJsonTooltip(fields=["nombre"], aliases=["Subcuenca"]),
+        ).add_to(mapa)
+        st_folium(
+            mapa,
+            height=430,
+            use_container_width=True,
+            returned_objects=[],
+            key="mapa-resumen-inicio",
+        )
 
 
 def elegir_modo(modo):
@@ -658,6 +719,7 @@ st.session_state["_seccion_publica_anterior"] = seccion_tablero
 
 if seccion_tablero == SECCION_INICIO:
     mostrar_hero_inicio()
+    mostrar_resumen_territorial_inicio()
     mostrar_acceso_selector()
     if selector_consulta in {"1", "true", "si", "sí"}:
         mostrar_selector_dialogo()
