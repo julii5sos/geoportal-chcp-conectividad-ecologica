@@ -86,8 +86,7 @@ class ComponentesGeoportalTests(unittest.TestCase):
             fuente.options,
             [
                 "JRC Tropical Moist Forest",
-                "ESRI Land Use / Land Cover",
-                "Sentinel-2 / NDVI",
+                "ESRI Global Land Use / Land Cover",
             ],
         )
         inicial = next(
@@ -100,6 +99,12 @@ class ComponentesGeoportalTests(unittest.TestCase):
         self.assertEqual(inicial.options[-1], "2024")
         self.assertEqual(final.options[-1], "2025")
         self.assertGreater(final.value, inicial.value)
+        ejecutar = next(
+            boton
+            for boton in app.button
+            if boton.label == "Calcular comparación científica"
+        )
+        self.assertTrue(ejecutar.disabled)
 
     def test_resultados_no_inventa_indicadores_antes_del_analisis(self):
         app = AppTest.from_file("app.py", default_timeout=60)

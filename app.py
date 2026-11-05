@@ -341,7 +341,7 @@ def mostrar_metodo():
         "Una explicación sencilla primero; las reglas técnicas permanecen disponibles después.",
         "Cada fuente responde una pregunta diferente. La aplicación conserva esas diferencias, "
         "aplica reglas documentadas y presenta una orientación que puede rastrearse hasta sus datos de origen.",
-        "Los años del comparador cambian el mapa, pero no modifican las reglas del índice configurado",
+        "Comparar recalcula cobertura, fragmentación y conectividad por año; el índice territorial y el ERI permanecen independientes",
     )
     st.markdown("## El proceso en cinco pasos")
     st.markdown(
@@ -703,10 +703,14 @@ if modo_analisis is None:
     st.stop()
 
 
-APLICACION_ACTIVA = Path(__file__).with_name("app_experiencia.py")
+APLICACION_ACTIVA = Path(__file__).with_name(
+    "app_temporal.py"
+    if seccion_tablero == SECCION_COMPARAR
+    else "app_experiencia.py"
+)
 if not APLICACION_ACTIVA.is_file():
     raise FileNotFoundError(
-        "No se encontró app_experiencia.py, la implementación activa del visor."
+        f"No se encontró {APLICACION_ACTIVA.name}, la implementación activa del visor."
     )
 
 runpy.run_path(str(APLICACION_ACTIVA), run_name="__main__")

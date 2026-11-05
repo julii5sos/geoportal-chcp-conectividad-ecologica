@@ -55,6 +55,9 @@ demuestra por sí sola conectividad funcional para una especie.
 - Catálogo temporal en `geoportal_catalogo.py`, con años válidos por fuente y
   rechazo explícito de períodos inexistentes. GEDI, bosque 2021 y ERI se identifican
   como productos de referencia fija, no como falsas series anuales.
+- Motor temporal científico en **Comparar**: recupera cobertura bosque/no bosque de
+  JRC TMF o ESRI para dos años y recalcula fragmentación y conectividad con parámetros
+  equivalentes. Ambas metodologías permanecen separadas.
 - 22 polígonos de corredores y 14 puntos críticos publicados por Almanaque Azul.
 - Las categorías originales `alta`, `mediana` y `media-baja`, sin sustituirlas por una clasificación inventada.
 - Los tres tramos panameños identificados como Corredor Biológico Mesoamericano: oeste, San Lorenzo y este.
@@ -188,6 +191,9 @@ Desde ese momento, cada área seleccionada usa la misma fuente: la aplicación f
 ## Estructura principal
 
 - `app.py`: navegación y punto de entrada de Streamlit.
+- `app_temporal.py`: controles, mapas, gráficas y descargas del análisis temporal.
+- `analisis_temporal.py`: recuperación anual, vectorización, transiciones y ejecución
+  independiente de las dos redes.
 - `app_experiencia.py`: interfaz cartográfica, motor Earth Engine e informe.
 - `portal_html.py`: encabezado, portada y composición visual copiados del HTML de referencia.
 - `geoportal_catalogo.py`: disponibilidad, versión y reglas temporales de las fuentes.
@@ -210,16 +216,19 @@ Desde ese momento, cada área seleccionada usa la misma fuente: la aplicación f
 python -m unittest discover -v
 ```
 
-La línea base transferida cuenta con 85 pruebas unitarias y funcionales. Las pruebas
-de integración que consultan Earth Engine requieren credenciales autorizadas y acceso
-explícito a los assets privados correspondientes.
+La suite incluye pruebas unitarias, funcionales y científicas con geometrías sintéticas.
+Las pruebas de integración que consultan Earth Engine se habilitan de forma explícita
+con `RUN_EE_INTEGRATION=1` y requieren un proyecto de Earth Engine autorizado.
 
-## Próxima fase
+## Análisis temporal
 
-La siguiente fase implementará un motor temporal para calcular cobertura forestal,
-fragmentación y conectividad estructural de forma independiente para dos años válidos.
-Hasta que esa metodología esté implementada y validada, los selectores temporales del
-comparador no deben interpretarse como un recálculo de todos los indicadores científicos.
+La sección **Comparar** recalcula cobertura forestal, fragmentación y conectividad
+estructural para dos años válidos. JRC TMF es la fuente principal; ESRI se ofrece como
+alternativa independiente. NDVI, GEDI, Hansen, ERI y la cobertura institucional 2021 no
+se presentan como coberturas anuales intercambiables.
+
+Consulte la [metodología y sus limitaciones](docs/METODOLOGIA_ANALISIS_TEMPORAL.md) y
+el [ejemplo reproducible JRC 2020–2025](docs/VALIDACION_JRC_2020_2025.md).
 
 ## Rendimiento y límites prácticos
 
