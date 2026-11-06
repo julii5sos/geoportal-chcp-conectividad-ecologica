@@ -39,8 +39,9 @@ $env:GEE_PROJECT_ID = "geoportal-513817"
 python -m flask --app webapp.main run --host 127.0.0.1 --port 8080
 ```
 
-Consulte [la arquitectura web](docs/ARQUITECTURA_WEB_HTML.md) y
-[la comparación visual](docs/COMPARACION_VISUAL_WEB_HTML.md).
+Consulte [la arquitectura web](docs/ARQUITECTURA_WEB_HTML.md),
+[la comparación visual](docs/COMPARACION_VISUAL_WEB_HTML.md) y
+[la preparación de seguridad y Cloud Run privado](docs/FASE6_SEGURIDAD_CLOUD_RUN_PRIVADO.md).
 
 ## Módulos científicos y funcionales
 

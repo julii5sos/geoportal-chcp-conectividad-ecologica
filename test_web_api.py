@@ -1,4 +1,5 @@
 import io
+import os
 import unittest
 from unittest.mock import patch
 
@@ -82,6 +83,48 @@ class WebApiTests(unittest.TestCase):
         response = self.client.get("/")
         self.assertIn("default-src 'self'", response.headers["Content-Security-Policy"])
         self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(response.headers["X-Robots-Tag"], "noindex, nofollow")
+        self.assertTrue(response.headers["X-Request-ID"])
+
+    def test_analysis_rejects_cross_site_browser_request(self):
+        response = self.client.post(
+            "/api/v1/analyses",
+            json={"analyses": ["coverage"], "area": {"mode": "basin"}, "source": "jrc_tmf", "initial_year": 2020, "final_year": 2025},
+            headers={"Origin": "https://example.invalid", "Sec-Fetch-Site": "cross-site"},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json["code"], "cross_site")
+
+    def test_analysis_requires_json_content_type(self):
+        response = self.client.post("/api/v1/analyses", data="not-json")
+        self.assertEqual(response.status_code, 415)
+
+    def test_busy_instance_returns_retryable_429(self):
+        gate = self.app.extensions["chcp_analysis_gate"]
+        self.assertTrue(gate.acquire())
+        try:
+            response = self.client.post(
+                "/api/v1/analyses",
+                json={"analyses": ["coverage"], "area": {"mode": "basin"}, "source": "jrc_tmf", "initial_year": 2020, "final_year": 2025},
+            )
+        finally:
+            gate.release()
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json["code"], "busy")
+        self.assertEqual(response.headers["Retry-After"], "15")
+
+    def test_analysis_rate_limit_is_bounded_per_instance(self):
+        with patch.dict(os.environ, {"WEB_ANALYSIS_RATE_LIMIT": "1", "WEB_RATE_LIMIT_WINDOW_SECONDS": "600"}):
+            app = create_app(testing=True)
+        client = app.test_client()
+        payload = {"analyses": ["coverage"], "area": {"mode": "basin"}, "source": "jrc_tmf", "initial_year": 2020, "final_year": 2025}
+        with patch("webapp.main.run_analysis", return_value={"result_id": "b" * 32}):
+            first = client.post("/api/v1/analyses", json=payload)
+            second = client.post("/api/v1/analyses", json=payload)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+        self.assertEqual(second.json["code"], "rate_limit")
+        self.assertGreater(int(second.headers["Retry-After"]), 0)
 
     def test_cache_deduplicates_equal_scientific_requests(self):
         cache = ResultCache(max_entries=2, ttl_seconds=60)

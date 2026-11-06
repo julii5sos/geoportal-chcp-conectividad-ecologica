@@ -44,6 +44,35 @@ class ConfiguracionGeeTests(unittest.TestCase):
         self.assertEqual(conexion.authentication_mode, "credenciales_locales")
         self.assertEqual(ee_falso.llamadas, [{"project": "geoportal-513817"}])
 
+    def test_cloud_run_usa_application_default_credentials_sin_clave(self):
+        ee_falso = _EarthEngineFalso()
+        conexion = inicializar_earth_engine(
+            ee_falso,
+            environ={
+                "GEE_PROJECT_ID": "geoportal-513817",
+                "K_SERVICE": "geoportal-chcp-private",
+            },
+        )
+        self.assertEqual(conexion.authentication_mode, "application_default_credentials")
+        self.assertEqual(ee_falso.llamadas, [{"project": "geoportal-513817"}])
+
+    def test_cloud_run_rechaza_clave_json_inline(self):
+        with self.assertRaisesRegex(ValueError, "Application Default Credentials"):
+            inicializar_earth_engine(
+                _EarthEngineFalso(),
+                environ={
+                    "GEE_PROJECT_ID": "geoportal-513817",
+                    "K_SERVICE": "geoportal-chcp-private",
+                    "GEE_SERVICE_ACCOUNT_JSON": json.dumps(
+                        {
+                            "project_id": "geoportal-513817",
+                            "client_email": "geoportal@example.invalid",
+                            "private_key": "valor-solo-para-prueba",
+                        }
+                    ),
+                },
+            )
+
     def test_cuenta_de_servicio_se_valida_sin_exponer_el_secreto(self):
         ee_falso = _EarthEngineFalso()
         informacion = {

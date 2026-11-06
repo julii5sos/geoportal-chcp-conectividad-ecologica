@@ -36,13 +36,13 @@ from webapp.cache import CachedResult, ResultCache
 from webapp.models import AnalysisRequest, AreaSelection, EriRequest
 
 
-MAX_COORDINATES = int(os.getenv("WEB_MAX_COORDINATES", "20000"))
-MAX_ANALYSIS_AREA_HA = float(os.getenv("WEB_MAX_ANALYSIS_AREA_HA", "500000"))
-MAX_MAP_FEATURES = int(os.getenv("WEB_MAX_MAP_FEATURES", "2500"))
+MAX_COORDINATES = int(os.getenv("WEB_MAX_COORDINATES", "5000"))
+MAX_ANALYSIS_AREA_HA = float(os.getenv("WEB_MAX_ANALYSIS_AREA_HA", "345000"))
+MAX_MAP_FEATURES = int(os.getenv("WEB_MAX_MAP_FEATURES", "1500"))
 
 _CACHE = ResultCache(
-    max_entries=int(os.getenv("WEB_RESULT_CACHE_ENTRIES", "8")),
-    ttl_seconds=int(os.getenv("WEB_RESULT_CACHE_TTL", "1800")),
+    max_entries=int(os.getenv("WEB_RESULT_CACHE_ENTRIES", "4")),
+    ttl_seconds=int(os.getenv("WEB_RESULT_CACHE_TTL", "900")),
 )
 _EE_LOCK = threading.Lock()
 _EE_READY = False

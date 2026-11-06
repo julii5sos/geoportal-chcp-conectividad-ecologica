@@ -31,14 +31,16 @@ Las solicitudes se validan en el servidor, se recortan a la CHCP y usan un
 catálogo cerrado de fuentes. No se aceptan identificadores de assets enviados
 por el navegador.
 
-## Cloud Run
+## Cloud Run privado
 
-El `Dockerfile` usa Gunicorn con una solicitud síncrona de hasta siete minutos.
-Configure como mínimo `GEE_PROJECT_ID`, una identidad de servicio autorizada y
-los assets privados que se decida conservar. No incluya claves JSON en la imagen.
+El `Dockerfile` ejecuta Gunicorn como usuario sin privilegios y aplica límites de
+solicitud, concurrencia y reciclado de procesos. En Cloud Run la aplicación usa la
+identidad de servicio adjunta mediante Application Default Credentials; rechaza por
+defecto una clave JSON incrustada.
 
-La preparación detallada, límites operativos y permisos mínimos están documentados
-en [`docs/ARQUITECTURA_WEB_HTML.md`](../docs/ARQUITECTURA_WEB_HTML.md).
+La configuración inicial se encuentra en `deploy/` y la guía completa —roles
+mínimos, acceso privado, costos, riesgos y apagado— está en
+[`docs/FASE6_SEGURIDAD_CLOUD_RUN_PRIVADO.md`](../docs/FASE6_SEGURIDAD_CLOUD_RUN_PRIVADO.md).
 
 ## Prueba representativa
 

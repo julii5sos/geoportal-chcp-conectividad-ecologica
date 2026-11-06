@@ -13,11 +13,16 @@ Orden de resolución del proyecto:
 2. Alias transitorio `EE_PROJECT`.
 3. Valor predeterminado `geoportal-513817`.
 
-No existen tokens ni claves en el código. Si no hay una cuenta de servicio,
-Earth Engine usa las credenciales locales administradas fuera del repositorio.
-En servidor, `GEE_SERVICE_ACCOUNT_JSON` tiene prioridad; el nombre anterior
-`EE_SERVICE_ACCOUNT_JSON` se admite durante la migración. La aplicación rechaza
-un JSON cuyo `project_id` no coincida con el proyecto configurado.
+No existen tokens ni claves en el código. En desarrollo, Earth Engine usa las
+credenciales locales administradas fuera del repositorio. En Cloud Run se usa la
+identidad de servicio adjunta mediante Application Default Credentials. La
+aplicación rechaza por defecto `GEE_SERVICE_ACCOUNT_JSON` y
+`EE_SERVICE_ACCOUNT_JSON` cuando detecta Cloud Run, para evitar claves de larga
+duración. El soporte JSON se conserva únicamente para plataformas heredadas que no
+proporcionen identidad administrada.
+
+La preparación privada de Cloud Run está documentada en
+[`FASE6_SEGURIDAD_CLOUD_RUN_PRIVADO.md`](FASE6_SEGURIDAD_CLOUD_RUN_PRIVADO.md).
 
 ## Autenticación local con la cuenta nueva
 

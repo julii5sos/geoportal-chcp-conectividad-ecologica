@@ -119,11 +119,23 @@ def inicializar_earth_engine(
         )
         if secreto is not None:
             break
+    if secreto is not None and _texto(entorno.get("K_SERVICE")) is not None:
+        permitir_json = str(entorno.get("GEE_ALLOW_INLINE_SERVICE_ACCOUNT_JSON", "")).lower()
+        if permitir_json not in {"1", "true", "yes"}:
+            raise ValueError(
+                "Cloud Run debe usar Application Default Credentials de la identidad "
+                "adjunta; no configure una clave JSON en variables o secretos."
+            )
     informacion = _informacion_cuenta_servicio(secreto, proyecto)
 
     if informacion is None:
         ee_module.Initialize(project=proyecto)
-        return GeeConnection(proyecto, "credenciales_locales")
+        modo = (
+            "application_default_credentials"
+            if _texto(entorno.get("K_SERVICE")) is not None
+            else "credenciales_locales"
+        )
+        return GeeConnection(proyecto, modo)
 
     if credentials_factory is None:
         from google.oauth2 import service_account

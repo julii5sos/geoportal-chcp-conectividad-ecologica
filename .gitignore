@@ -11,3 +11,4 @@ uploads/
 output/
 tmp/
 .reference_html_original/
+deploy/cloud-run-service.yaml
