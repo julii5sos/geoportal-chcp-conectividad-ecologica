@@ -10,9 +10,10 @@
     </div>
     <div class="side-body" id="panel-layers"></div>
     <div class="side-body" id="panel-filters" hidden>
-      <section class="filter-block"><h3>Área preparada</h3><p id="filter-area-label">Dibuje un polígono o use el asistente para seleccionar una unidad territorial.</p></section>
+      <section class="filter-block"><h3>Área preparada</h3><p id="filter-area-label">Dibuje un polígono o use el asistente para seleccionar una unidad territorial.</p><p class="hint" id="selected-territory-id"></p></section>
       <section class="filter-block"><h3>Fuente temporal</h3><label for="quick-source">Producto</label><select id="quick-source"></select><div class="year-grid"><label>Año inicial<select id="quick-initial-year"></select></label><label>Año final<select id="quick-final-year"></select></label></div></section>
       <section class="filter-block"><h3>Parámetros</h3><label for="quick-distance">Distancia máxima entre parches</label><select id="quick-distance"><option>100</option><option>250</option><option selected>500</option><option>750</option><option>1000</option><option>1500</option><option>2000</option></select><span class="hint">Metros entre bordes; se aplica igual en ambos años.</span></section>
+      <section class="filter-block"><h3>Visualización</h3><label for="layer-opacity">Opacidad de resultados <output id="layer-opacity-value">76 %</output></label><input id="layer-opacity" type="range" min="20" max="100" step="5" value="76"><span class="hint">Solo modifica la visualización; no recalcula el análisis.</span></section>
     </div>
     <div class="side-body" id="panel-basemaps" hidden><div class="bm" id="basemap-list"></div><p class="hint-p small">El mapa base solo cambia la visualización y nunca recalcula resultados.</p></div>
     <div class="side-foot"><button class="btn btn-p" id="open-analysis" type="button">Realizar análisis</button><button class="btn btn-s" id="download-result" type="button" disabled>Descargas</button></div>

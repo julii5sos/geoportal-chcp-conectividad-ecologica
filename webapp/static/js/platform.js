@@ -1,10 +1,12 @@
 (async function () {
-  const { $, $$, escapeHtml: esc, number, hectares, api, toast } = window.CHCP;
+  const { $, $$, escapeHtml: esc, number, hectares, api, toast, readPortalState, writePortalState } = window.CHCP;
   if (!window.L) return;
 
   const state = {
     config: null,
     territory: null,
+    sourceCatalog: null,
+    resultOpacity: .76,
     result: null,
     eri: null,
     resultLayers: new Map(),
@@ -39,6 +41,10 @@
   baseMaps[currentBase].addTo(map);
   map.setView([9.1, -79.7], 9);
   map.on('mousemove', (event) => { $('#coords').textContent = `lat ${event.latlng.lat.toFixed(4)} · lon ${event.latlng.lng.toFixed(4)}`; });
+
+  function symColor(group, key, fallback) {
+    return state.config?.symbology?.[group]?.[key]?.color || fallback;
+  }
 
   function setBusy(on, title = 'Procesando') {
     const busy = $('#busy');
@@ -90,6 +96,24 @@
     if (active) { layer.addTo(map); state.activeLayers.add(key); }
   }
 
+  function addTileResultLayer(key, name, descriptor, active = false) {
+    if (!descriptor?.tile_url) return;
+    const classes = descriptor.classes || [];
+    const layer = L.tileLayer(descriptor.tile_url, {
+      opacity: state.resultOpacity,
+      attribution: 'Google Earth Engine',
+      maxZoom: 18,
+    });
+    state.resultLayers.set(key, {
+      key,
+      name,
+      layer,
+      color: classes[0]?.color || '#0a4393',
+      legend: classes.map((item) => ({name: item.etiqueta, color: item.color})),
+    });
+    if (active) { layer.addTo(map); state.activeLayers.add(key); }
+  }
+
   function clearResultLayers() {
     state.resultLayers.forEach(({layer}) => { if (map.hasLayer(layer)) map.removeLayer(layer); });
     state.resultLayers.clear();
@@ -120,8 +144,12 @@
       ? Array.from(state.resultLayers.values()).map((item) => layerRow(item.key, item.name, item.color, true, 'Resultado calculado')).join('')
       : layerRow('pending', 'Ejecute un análisis para habilitar resultados', '#d6deeb', false);
     const source = state.config?.sources?.[state.wizard.source];
-    const sourceInfo = source ? `<div class="source-note"><b>${esc(source.name)}</b><br>${source.anio_inicial}–${source.anio_final} · ${source.resolucion_m} m<br>${esc(source.definicion_bosque)}</div>` : '';
-    $('#panel-layers').innerHTML = group('Límites', basinRows) + group('Corredores publicados', corridorRows, false) + group('Cobertura y transiciones', temporalRows) + group('Fuente activa', sourceInfo, false) + group('ERI complementario', state.eri ? layerRow('eriTiles', 'Índice ERI indicativo', '#76b72a', state.resultLayers.has('eriTiles')) : layerRow('eriPending', 'Calcule el ERI desde Resultados', '#d6deeb', false), false);
+    const sourceInfo = source ? `<div class="source-note"><b>${esc(source.nombre)}</b><br>${source.anio_inicial}–${source.anio_final} · ${source.resolucion_m} m<br>${esc(source.definicion_bosque)}</div>` : '';
+    const complementaryRows = (state.sourceCatalog?.sources || [])
+      .filter((item) => item.categoria.startsWith('B'))
+      .map((item) => layerRow(`catalog-${item.clave}`, item.nombre_oficial, '#9aa7b8', false, item.estado_html))
+      .join('');
+    $('#panel-layers').innerHTML = group('Límites', basinRows) + group('Corredores publicados', corridorRows, false) + group('Cobertura y transiciones', temporalRows) + group('Fuente activa', sourceInfo, false) + (complementaryRows ? group('Fuentes complementarias', complementaryRows, false) : '') + group('ERI complementario', state.eri ? layerRow('eriTiles', 'Índice ERI indicativo', '#76b72a', state.resultLayers.has('eriTiles')) : layerRow('eriPending', 'Calcule el ERI desde Resultados', '#d6deeb', false), false);
     $$('#panel-layers .lg>button').forEach((button) => button.addEventListener('click', () => button.parentElement.classList.toggle('open')));
     $$('[data-layer]', $('#panel-layers')).forEach((input) => input.addEventListener('change', () => {
       const key = input.dataset.layer;
@@ -140,7 +168,9 @@
     const legend = $('#map-legend');
     if (!items.length) { legend.hidden = true; return; }
     legend.hidden = false;
-    legend.innerHTML = `<span class="eyebrow">Capas visibles</span>${items.map((item) => `<div class="legend-item"><i style="background:${item.color}"></i>${esc(item.name)}</div>`).join('')}`;
+    legend.innerHTML = `<span class="eyebrow">Capas visibles</span>${items.map((item) => item.legend?.length
+      ? `<div class="legend-layer"><b>${esc(item.name)}</b>${item.legend.map((entry) => `<div class="legend-item"><i style="background:${entry.color}"></i>${esc(entry.name)}</div>`).join('')}</div>`
+      : `<div class="legend-item"><i style="background:${item.color}"></i>${esc(item.name)}</div>`).join('')}`;
   }
 
   let basinLayer;
@@ -193,10 +223,21 @@
     sourceSelect.innerHTML = Object.values(state.config.sources).map((source) => `<option value="${source.clave}" ${source.clave === state.wizard.source ? 'selected' : ''}>${esc(source.nombre)}</option>`).join('');
     selectYears(state.wizard.source, $('#quick-initial-year'), $('#quick-final-year'));
     $('#quick-distance').value = String(state.wizard.maximumDistance);
-    sourceSelect.onchange = () => { state.wizard.source = sourceSelect.value; selectYears(state.wizard.source, $('#quick-initial-year'), $('#quick-final-year')); renderLayers(); };
-    $('#quick-initial-year').onchange = (event) => { state.wizard.initialYear = Number(event.target.value); };
-    $('#quick-final-year').onchange = (event) => { state.wizard.finalYear = Number(event.target.value); };
-    $('#quick-distance').onchange = (event) => { state.wizard.maximumDistance = Number(event.target.value); };
+    $('#layer-opacity').value = String(Math.round(state.resultOpacity * 100));
+    $('#layer-opacity-value').textContent = `${Math.round(state.resultOpacity * 100)} %`;
+    sourceSelect.onchange = () => { state.wizard.source = sourceSelect.value; selectYears(state.wizard.source, $('#quick-initial-year'), $('#quick-final-year')); renderLayers(); persistWizard(); };
+    $('#quick-initial-year').onchange = (event) => { state.wizard.initialYear = Number(event.target.value); persistWizard(); };
+    $('#quick-final-year').onchange = (event) => { state.wizard.finalYear = Number(event.target.value); persistWizard(); };
+    $('#quick-distance').onchange = (event) => { state.wizard.maximumDistance = Number(event.target.value); persistWizard(); };
+    $('#layer-opacity').oninput = (event) => {
+      state.resultOpacity = Number(event.target.value) / 100;
+      $('#layer-opacity-value').textContent = `${event.target.value} %`;
+      state.resultLayers.forEach(({layer}) => {
+        if (typeof layer.setOpacity === 'function') layer.setOpacity(state.resultOpacity);
+        else if (typeof layer.setStyle === 'function') layer.setStyle({opacity:state.resultOpacity,fillOpacity:state.resultOpacity * .65});
+      });
+      writePortalState({resultOpacity:state.resultOpacity});
+    };
   }
 
   function currentAreaRequest() {
@@ -212,6 +253,18 @@
   }
 
   function updateAreaLabel() { $('#filter-area-label').textContent = areaLabel(); }
+
+  function persistWizard() {
+    writePortalState({
+      source: state.wizard.source,
+      initialYear: state.wizard.initialYear,
+      finalYear: state.wizard.finalYear,
+      maximumDistance: state.wizard.maximumDistance,
+      minimumPatchArea: state.wizard.minimumPatchArea,
+      areaMode: state.wizard.areaMode,
+      subbasin: state.wizard.subbasin,
+    });
+  }
 
   function startDrawing() {
     closeWizard();
@@ -317,7 +370,7 @@
 
   function renderParameterStep(body) {
     const sources = Object.values(state.config.sources);
-    body.innerHTML = `<h3>Fuente, período y parámetros</h3><p class="sub">Cada fuente muestra únicamente sus años reales. JRC y ESRI no se mezclan.</p><div class="fld"><label for="wizard-source">Fuente temporal</label><select id="wizard-source">${sources.map((source) => `<option value="${source.clave}" ${source.clave === state.wizard.source ? 'selected' : ''}>${esc(source.nombre)} · ${source.resolucion_m} m</option>`).join('')}</select></div><div class="parameter-grid"><div class="fld"><label for="wizard-initial">Año inicial</label><select id="wizard-initial"></select></div><div class="fld"><label for="wizard-final">Año final</label><select id="wizard-final"></select></div><div class="fld"><label for="wizard-distance">Distancia máxima</label><select id="wizard-distance">${[100,250,500,750,1000,1500,2000].map((value) => `<option value="${value}" ${value === state.wizard.maximumDistance ? 'selected' : ''}>${value} m</option>`).join('')}</select></div><div class="fld"><label for="wizard-min-area">Área mínima de parche</label><input id="wizard-min-area" type="number" min="0" max="500" step="0.1" value="${state.wizard.minimumPatchArea}"><span class="hint">Hectáreas; se aplica igual en ambos años.</span></div></div><div class="source-note" id="wizard-source-note"></div>`;
+    body.innerHTML = `<h3>Fuente, período y parámetros</h3><p class="sub">JRC y ESRI se calculan independientemente. La modalidad integrada compara sus resultados sin fusionarlos.</p><div class="fld"><label for="wizard-source">Fuente temporal</label><select id="wizard-source">${sources.map((source) => `<option value="${source.clave}" ${source.clave === state.wizard.source ? 'selected' : ''}>${esc(source.nombre)} · ${source.resolucion_m} m</option>`).join('')}</select></div><div class="parameter-grid"><div class="fld"><label for="wizard-initial">Año inicial</label><select id="wizard-initial"></select></div><div class="fld"><label for="wizard-final">Año final</label><select id="wizard-final"></select></div><div class="fld"><label for="wizard-distance">Distancia máxima</label><select id="wizard-distance">${[100,250,500,750,1000,1500,2000].map((value) => `<option value="${value}" ${value === state.wizard.maximumDistance ? 'selected' : ''}>${value} m</option>`).join('')}</select></div><div class="fld"><label for="wizard-min-area">Área mínima de parche</label><input id="wizard-min-area" type="number" min="0" max="500" step="0.1" value="${state.wizard.minimumPatchArea}"><span class="hint">Hectáreas; se aplica igual en ambos años.</span></div></div><div class="source-note" id="wizard-source-note"></div>`;
     const sourceSelect = $('#wizard-source');
     const initial = $('#wizard-initial');
     const final = $('#wizard-final');
@@ -338,7 +391,7 @@
   function renderReviewStep(body) {
     const source = state.config.sources[state.wizard.source];
     const names = state.wizard.analyses.map((key) => state.config.analyses.find((item) => item.key === key)?.name).filter(Boolean).join(', ');
-    body.innerHTML = `<h3>Revise antes de ejecutar</h3><dl class="rev"><dt>Análisis</dt><dd>${esc(names)}</dd><dt>Área</dt><dd>${esc(areaLabel())}</dd><dt>Fuente</dt><dd>${esc(source.name)}</dd><dt>Período</dt><dd>${state.wizard.initialYear}–${state.wizard.finalYear}</dd><dt>Resolución nominal</dt><dd>${source.resolucion_m} m</dd><dt>Distancia entre parches</dt><dd>${number(state.wizard.maximumDistance, 0)} m</dd><dt>Área mínima</dt><dd>${number(state.wizard.minimumPatchArea, 1)} ha</dd></dl><div class="review-note">El resultado es indicativo. El ERI se calcula por separado y no altera las métricas temporales.</div>`;
+    body.innerHTML = `<h3>Revise antes de ejecutar</h3><dl class="rev"><dt>Análisis</dt><dd>${esc(names)}</dd><dt>Área</dt><dd>${esc(areaLabel())}</dd><dt>Fuente</dt><dd>${esc(source.nombre)}</dd><dt>Período</dt><dd>${state.wizard.initialYear}–${state.wizard.finalYear}</dd><dt>Resolución nominal</dt><dd>${source.resolucion_m} m</dd><dt>Distancia entre parches</dt><dd>${number(state.wizard.maximumDistance, 0)} m</dd><dt>Área mínima</dt><dd>${number(state.wizard.minimumPatchArea, 1)} ha</dd></dl><div class="review-note">El resultado es indicativo. El ERI se calcula por separado y no altera las métricas temporales.</div>`;
   }
 
   $('#wizard-back').addEventListener('click', () => { if (state.wizardStep > 0) { state.wizardStep -= 1; renderWizard(); } });
@@ -366,6 +419,7 @@
   }
 
   async function runAnalysis() {
+    persistWizard();
     setBusy(true, 'Calculando análisis científico');
     $('#open-analysis').disabled = true;
     try {
@@ -392,13 +446,25 @@
     const result = response.result;
     const yi = String(result.anio_inicial);
     const yf = String(result.anio_final);
-    addResultLayer('stable', 'Bosque estable', result.transiciones?.bosque_estable?.geojson, '#2e7d32', false);
-    addResultLayer('loss', 'Pérdida de bosque', result.transiciones?.perdida_bosque?.geojson, '#e76f51', true);
-    addResultLayer('gain', 'Ganancia de clase bosque', result.transiciones?.ganancia_bosque?.geojson, '#43aa8b', true);
+    if (result.mode === 'integrated') {
+      const concordance = result.concordance || {};
+      addTileResultLayer('concordanceState', `Concordancia de cobertura ${yf}`, concordance.maps?.state, true);
+      addTileResultLayer('concordanceChange', `Concordancia de cambios ${yi}–${yf}`, concordance.maps?.change, false);
+      const jrc = result.sources?.jrc_tmf;
+      const esri = result.sources?.esri_lulc;
+      addResultLayer('jrcLoss', 'Pérdida según JRC', jrc?.transiciones?.perdida_bosque?.geojson, '#D94438', false);
+      addResultLayer('jrcGain', 'Ganancia según JRC', jrc?.transiciones?.ganancia_bosque?.geojson, '#76B852', false);
+      addResultLayer('esriLoss', 'Pérdida según ESRI', esri?.transiciones?.perdida_bosque?.geojson, '#F07A52', false);
+      addResultLayer('esriGain', 'Ganancia según ESRI', esri?.transiciones?.ganancia_bosque?.geojson, '#9BCB68', false);
+    } else {
+    addResultLayer('stable', 'Bosque estable', result.transiciones?.bosque_estable?.geojson, symColor('transiciones_forestales','bosque_estable','#187A45'), false);
+    addResultLayer('loss', 'Pérdida de bosque', result.transiciones?.perdida_bosque?.geojson, symColor('transiciones_forestales','perdida_bosque','#D94438'), true);
+    addResultLayer('gain', 'Ganancia de clase bosque', result.transiciones?.ganancia_bosque?.geojson, symColor('transiciones_forestales','ganancia_bosque','#76B852'), true);
     addResultLayer('patchesInitial', `Parches ${yi}`, result.periodos?.[yi]?.analisis?.parches_geojson, '#1f8a70', false);
     addResultLayer('patchesFinal', `Parches ${yf}`, result.periodos?.[yf]?.analisis?.parches_geojson, '#3a7ca5', true);
     addResultLayer('connectionsInitial', `Conexiones ${yi}`, result.periodos?.[yi]?.analisis?.conexiones_geojson, '#fabc20', false);
     addResultLayer('connectionsFinal', `Conexiones ${yf}`, result.periodos?.[yf]?.analisis?.conexiones_geojson, '#7a5195', false);
+    }
     if (state.areaLayer) map.removeLayer(state.areaLayer);
     state.areaLayer = L.geoJSON(response.area.geometry, {style: layerStyle('area')}).addTo(map);
     map.fitBounds(state.areaLayer.getBounds(), {padding: [35, 35], maxZoom: 14});
@@ -414,6 +480,7 @@
 
   function resultViews(response) {
     const result = response.result;
+    if (result.mode === 'integrated') return integratedResultViews(response);
     const yi = String(result.anio_inicial);
     const yf = String(result.anio_final);
     const stats = result.estadisticas_cobertura;
@@ -430,18 +497,45 @@
     return {summary, charts, interpretation: interpretationHtml, eri};
   }
 
+  function integratedResultViews(response) {
+    const result = response.result;
+    const yi = String(result.anio_inicial);
+    const yf = String(result.anio_final);
+    const jrc = result.sources.jrc_tmf;
+    const esri = result.sources.esri_lulc;
+    const jrcStats = jrc.estadisticas_cobertura;
+    const esriStats = esri.estadisticas_cobertura;
+    const jrcFinal = jrcStats.periodos[yf];
+    const esriFinal = esriStats.periodos[yf];
+    const jrcChange = jrcStats.comparacion;
+    const esriChange = esriStats.comparacion;
+    const jrcFragments = jrc.periodos[yf].resumen;
+    const esriFragments = esri.periodos[yf].resumen;
+    const concordance = result.concordance;
+    const summary = `<div class="metric-grid">${metric(`Bosque JRC ${yf}`, hectares(jrcFinal.bosque_ha), `${number(jrcFinal.porcentaje_bosque,1)} % válido`)}${metric(`Bosque ESRI ${yf}`, hectares(esriFinal.bosque_ha), `${number(esriFinal.porcentaje_bosque,1)} % válido`)}${metric('Diferencia final', hectares(concordance.diferencia_superficie_forestal_final_ha), 'JRC menos ESRI')}${metric('Concordancia de estado', `${number(concordance.estado.concordancia_pct,1)} %`, 'Sobre área válida común')}${metric('Pérdida JRC', hectares(jrcChange.perdida_bosque_ha), `${yi}–${yf}`)}${metric('Pérdida ESRI', hectares(esriChange.perdida_bosque_ha), `${yi}–${yf}`)}${metric('Parches JRC', number(jrcFragments.numero_parches,0), `Año ${yf}`)}${metric('Parches ESRI', number(esriFragments.numero_parches,0), `Año ${yf}`)}</div><div class="interpretation"><b>Lectura comparativa.</b> La concordancia identifica coincidencias y discrepancias entre productos. No crea una cobertura definitiva ni sustituye validación de campo.</div><ul class="warning-list">${response.warnings.map((warning) => `<li>${esc(warning)}</li>`).join('')}</ul>`;
+    const charts = `<div class="chart-card"><h3>Superficie forestal final</h3>${barChart([{label:'JRC TMF',value:jrcFinal.bosque_ha,formatted:hectares(jrcFinal.bosque_ha),color:'#1F8A70'},{label:'ESRI LULC',value:esriFinal.bosque_ha,formatted:hectares(esriFinal.bosque_ha),color:'#3A7CA5'}])}</div><div class="chart-card"><h3>Pérdida detectada</h3>${barChart([{label:'JRC TMF',value:jrcChange.perdida_bosque_ha,formatted:hectares(jrcChange.perdida_bosque_ha),color:'#D94438'},{label:'ESRI LULC',value:esriChange.perdida_bosque_ha,formatted:hectares(esriChange.perdida_bosque_ha),color:'#F07A52'}])}</div><div class="chart-card"><h3>Ganancia de clase bosque</h3>${barChart([{label:'JRC TMF',value:jrcChange.ganancia_bosque_ha,formatted:hectares(jrcChange.ganancia_bosque_ha),color:'#76B852'},{label:'ESRI LULC',value:esriChange.ganancia_bosque_ha,formatted:hectares(esriChange.ganancia_bosque_ha),color:'#9BCB68'}])}</div><div class="chart-card"><h3>Parches del año final</h3>${barChart([{label:'JRC TMF',value:jrcFragments.numero_parches,formatted:number(jrcFragments.numero_parches,0),color:'#1F8A70'},{label:'ESRI LULC',value:esriFragments.numero_parches,formatted:number(esriFragments.numero_parches,0),color:'#3A7CA5'}])}</div>`;
+    const stateAreas = concordance.estado.areas_ha;
+    const changeAreas = concordance.cambio.areas_ha;
+    const concordanceHtml = `<div class="chart-card"><h3>Concordancia de cobertura ${yf}</h3>${barChart([{label:'Bosque ambas',value:stateAreas.bosque_ambas,formatted:hectares(stateAreas.bosque_ambas),color:'#187A45'},{label:'No bosque ambas',value:stateAreas.no_bosque_ambas,formatted:hectares(stateAreas.no_bosque_ambas),color:'#D7C2A1'},{label:'Solo JRC',value:stateAreas.bosque_solo_jrc,formatted:hectares(stateAreas.bosque_solo_jrc),color:'#6B5FB5'},{label:'Solo ESRI',value:stateAreas.bosque_solo_esri,formatted:hectares(stateAreas.bosque_solo_esri),color:'#2F8FB3'}])}</div><div class="chart-card"><h3>Eventos coincidentes ${yi}–${yf}</h3>${barChart([{label:'Pérdida ambas',value:changeAreas.perdida_ambas,formatted:hectares(changeAreas.perdida_ambas),color:'#8B1E1E'},{label:'Ganancia ambas',value:changeAreas.ganancia_ambas,formatted:hectares(changeAreas.ganancia_ambas),color:'#3D7E3A'},{label:'Pérdida solo JRC',value:changeAreas.perdida_solo_jrc,formatted:hectares(changeAreas.perdida_solo_jrc),color:'#D94438'},{label:'Pérdida solo ESRI',value:changeAreas.perdida_solo_esri,formatted:hectares(changeAreas.perdida_solo_esri),color:'#F07A52'}])}</div><div class="review-note">La agregación de ESRI a 30 m usa moda sobre la malla JRC. No se emplea interpolación bilineal para clases.</div>`;
+    const interpretation = `<div class="interpretation"><b>JRC TMF.</b> ${esc(jrc.interpretacion_ecologica.cobertura)}</div><div class="interpretation"><b>ESRI LULC.</b> ${esc(esri.interpretacion_ecologica.cobertura)}</div><div class="review-note">${esc(result.metadata.scientific_scope)}</div><ul class="warning-list">${result.warnings.map((warning) => `<li>${esc(warning)}</li>`).join('')}</ul>`;
+    const eri = `<div id="eri-content" class="empty-result"><h3>ERI complementario</h3><p>Se calcula por separado y no interviene en la concordancia JRC–ESRI.</p><button class="btn btn-p" id="calculate-eri" type="button">Calcular ERI para esta área</button></div>`;
+    return {summary, charts, concordance: concordanceHtml, interpretation, eri};
+  }
+
   function renderAnalysisResult(response) {
     renderAnalysisMap(response);
     const views = resultViews(response);
     $('#results-title').textContent = 'Resultado del análisis';
     $('#results-subtitle').textContent = `${response.area.label} · ${response.result.anio_inicial}–${response.result.anio_final}`;
-    $('#results-body').innerHTML = `<div class="result-tabs" role="tablist"><button role="tab" data-result-tab="summary" aria-selected="true">Lectura</button><button role="tab" data-result-tab="charts" aria-selected="false">Gráficas</button><button role="tab" data-result-tab="interpretation" aria-selected="false">Interpretación</button><button role="tab" data-result-tab="eri" aria-selected="false">ERI</button></div><div class="result-view" id="view-summary">${views.summary}</div><div class="result-view" id="view-charts" hidden>${views.charts}</div><div class="result-view" id="view-interpretation" hidden>${views.interpretation}</div><div class="result-view" id="view-eri" hidden>${views.eri}</div><a class="btn btn-s download-link" href="/api/v1/results/${response.result_id}/download.zip">Descargar resultados y metadatos</a>`;
+    const tabs = ['summary','charts',...(views.concordance ? ['concordance'] : []),'interpretation','eri'];
+    const labels = {summary:'Lectura',charts:'Gráficas',concordance:'Concordancia',interpretation:'Interpretación',eri:'ERI'};
+    $('#results-body').innerHTML = `<div class="result-tabs" role="tablist">${tabs.map((key,index) => `<button role="tab" data-result-tab="${key}" aria-selected="${index === 0}">${labels[key]}</button>`).join('')}</div>${tabs.map((key,index) => `<div class="result-view" id="view-${key}" ${index ? 'hidden' : ''}>${views[key]}</div>`).join('')}<a class="btn btn-s download-link" href="/api/v1/results/${response.result_id}/download.zip">Descargar resultados y metadatos</a>`;
     const panel = $('#results-panel');
     panel.classList.remove('closed');
     $('#results-reopen').hidden = true;
     $$('[data-result-tab]', panel).forEach((button) => button.addEventListener('click', () => {
       $$('[data-result-tab]', panel).forEach((item) => item.setAttribute('aria-selected', String(item === button)));
-      ['summary','charts','interpretation','eri'].forEach((key) => { $(`#view-${key}`).hidden = button.dataset.resultTab !== key; });
+      tabs.forEach((key) => { $(`#view-${key}`).hidden = button.dataset.resultTab !== key; });
     }));
     $('#calculate-eri').addEventListener('click', calculateEri);
     setTimeout(() => map.invalidateSize(), 220);
@@ -484,13 +578,48 @@
     ['layers','filters','basemaps'].forEach((key) => { $(`#panel-${key}`).hidden = button.dataset.panel !== key; });
   }));
 
+  async function applyPreparedTerritory() {
+    const params = new URLSearchParams(window.location.search);
+    const stored = readPortalState();
+    const requested = params.get('territory') || stored.territoryId;
+    if (requested) {
+      try {
+        const summary = await api(`/api/v1/territories/${encodeURIComponent(requested)}/summary`);
+        $('#selected-territory-id').textContent = `Territorio preparado: ${summary.territory.nombre}`;
+        if (summary.territory.tipo === 'subcuenca') {
+          state.wizard.areaMode = 'subbasin';
+          state.wizard.subbasin = summary.territory.nombre;
+        } else {
+          state.wizard.areaMode = 'basin';
+          state.wizard.subbasin = '';
+        }
+        if (state.areaLayer) map.removeLayer(state.areaLayer);
+        state.areaLayer = L.geoJSON(summary.geometry, {style: layerStyle('area')}).addTo(map);
+        map.fitBounds(state.areaLayer.getBounds(), {padding:[35,35],maxZoom:13});
+        updateAreaLabel();
+      } catch (error) {
+        toast(`No se pudo preparar el territorio guardado: ${error.message}`, 'error');
+      }
+    }
+    if (params.get('draw') === '1') startDrawing();
+  }
+
   try {
-    [state.config, state.territory] = await Promise.all([api('/api/v1/config'), api('/api/v1/territory')]);
+    const stored = readPortalState();
+    state.wizard.source = stored.source || state.wizard.source;
+    state.wizard.initialYear = Number(stored.initialYear || state.wizard.initialYear);
+    state.wizard.finalYear = Number(stored.finalYear || state.wizard.finalYear);
+    state.wizard.maximumDistance = Number(stored.maximumDistance || state.wizard.maximumDistance);
+    state.wizard.minimumPatchArea = Number(stored.minimumPatchArea || state.wizard.minimumPatchArea);
+    state.resultOpacity = Math.max(.2, Math.min(1, Number(stored.resultOpacity || state.resultOpacity)));
+    [state.config, state.territory, state.sourceCatalog] = await Promise.all([api('/api/v1/config'), api('/api/v1/territory'), api('/api/v1/catalog/sources')]);
+    if (!state.config.sources[state.wizard.source]) state.wizard.source = 'jrc_tmf';
     renderTerritory();
     renderBasemaps();
     renderQuickFilters();
     renderLayers();
     updateAreaLabel();
+    await applyPreparedTerritory();
   } catch (error) {
     toast(`No se pudo iniciar el geoportal: ${error.message}`, 'error');
     $('#open-analysis').disabled = true;

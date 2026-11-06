@@ -42,6 +42,14 @@ python -m flask --app webapp.main run --host 127.0.0.1 --port 8080
 Consulte [la arquitectura web](docs/ARQUITECTURA_WEB_HTML.md),
 [la comparación visual](docs/COMPARACION_VISUAL_WEB_HTML.md) y
 [la preparación de seguridad y Cloud Run privado](docs/FASE6_SEGURIDAD_CLOUD_RUN_PRIVADO.md).
+La [matriz de trazabilidad multifuente](docs/FASE7_MATRIZ_TRAZABILIDAD.md) distingue
+fuentes operativas, parciales y pendientes; la
+[metodología de integración JRC–ESRI](docs/FASE7_INTEGRACION_MULTIFUENTE.md) documenta
+el período común, las máscaras y la concordancia sin fusionar productos.
+
+La Fase 7 añade búsqueda tolerante sobre la CHCP y sus 53 subcuencas, un Panel
+territorial que no inventa indicadores pendientes, y una tercera modalidad de
+análisis que ejecuta JRC y ESRI por separado y compara coincidencias y diferencias.
 
 ## Módulos científicos y funcionales
 

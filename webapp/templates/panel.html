@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Panel territorial · Geoportal CHCP 2.0{% endblock %}
+{% block body %}
+<main class="territory-panel-page" id="territory-panel" data-project="{{ project_id }}">
+  <section class="territory-panel-head">
+    <div class="wrap">
+      <span class="eyebrow">Panel ecológico territorial</span>
+      <div class="territory-panel-title">
+        <div><h1 id="panel-territory-name">Seleccione un territorio</h1><p id="panel-territory-group">Consulta inmediata sin recalcular Earth Engine.</p></div>
+        <a class="btn btn-w" id="panel-analyze" href="{{ url_for('platform') }}">Ejecutar análisis</a>
+      </div>
+    </div>
+  </section>
+  <section class="territory-panel-work wrap">
+    <aside class="territory-picker" aria-label="Selección territorial">
+      <label for="panel-search">Cuenca o subcuenca</label>
+      <input id="panel-search" type="search" autocomplete="off" placeholder="Buscar territorio" role="combobox" aria-expanded="false" aria-controls="panel-search-results">
+      <div id="panel-search-results" class="territory-results compact" role="listbox" hidden></div>
+      <div class="territory-facts" id="territory-facts" aria-live="polite"></div>
+      <button class="btn btn-s" id="panel-draw" type="button">Dibujar un área en Plataforma</button>
+    </aside>
+    <div class="territory-panel-main">
+      <div class="territory-kpis" id="territory-kpis"></div>
+      <div class="territory-tabs" role="tablist" aria-label="Resultados territoriales">
+        {% for key, label in [('summary','Resumen'),('coverage','Cobertura forestal'),('fragmentation','Fragmentación'),('connectivity','Conectividad'),('corridors','Corredores'),('eri','ERI'),('temporal','Comparación temporal'),('concordance','Concordancia JRC + ESRI')] %}
+        <button type="button" role="tab" data-territory-tab="{{ key }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ label }}</button>
+        {% endfor %}
+      </div>
+      <section class="territory-tab-view" id="territory-tab-view"></section>
+      <div id="panel-map" class="territory-panel-map" aria-label="Mapa del territorio seleccionado"></div>
+    </div>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/panel.js') }}"></script>{% endblock %}

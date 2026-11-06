@@ -37,6 +37,21 @@
     element._timer = setTimeout(() => { element.hidden = true; }, 4500);
   }
 
+  const stateKey = 'chcp.portal-state.v1';
+  function readPortalState() {
+    try { return JSON.parse(localStorage.getItem(stateKey) || '{}'); }
+    catch (_) { return {}; }
+  }
+  function writePortalState(patch) {
+    const next = {...readPortalState(), ...patch, updatedAt: new Date().toISOString()};
+    localStorage.setItem(stateKey, JSON.stringify(next));
+    return next;
+  }
+
+  function normalizeSearch(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim();
+  }
+
   const burger = $('#burger');
   const links = $('#links');
   burger?.addEventListener('click', () => {
@@ -44,6 +59,6 @@
     burger.setAttribute('aria-expanded', String(open));
   });
 
-  window.CHCP = {$, $$, escapeHtml, number, hectares, api, toast};
+  window.CHCP = {$, $$, escapeHtml, number, hectares, api, toast, readPortalState, writePortalState, normalizeSearch};
 })();
 

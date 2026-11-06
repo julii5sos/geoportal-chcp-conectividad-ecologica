@@ -228,6 +228,31 @@ def construir_cobertura_bosque_ee(
     )
 
 
+def construir_estado_binario_ee(
+    fuente: str,
+    anio: int,
+    geometria,
+    *,
+    ee_module=None,
+):
+    """Devuelve bosque=1/no bosque=0 y una máscara válida explícita.
+
+    A diferencia de :func:`construir_cobertura_bosque_ee`, conserva los ceros.
+    Se usa para concordancia entre productos sin tratar NoData como no bosque.
+    """
+
+    estado, valida = _estado_y_mascara_valida_ee(
+        fuente, anio, geometria, ee_module=ee_module
+    )
+    if fuente == "jrc_tmf":
+        bosque = estado.eq(1).Or(estado.eq(2)).Or(estado.eq(4))
+    elif fuente == "esri_lulc":
+        bosque = estado.eq(2)
+    else:
+        raise ValueError(f"No existe una regla bosque/no bosque para {fuente}.")
+    return bosque.rename(f"bosque_{fuente}_{anio}").toByte(), valida.toByte()
+
+
 def _area_geojson_ha(area_geojson: dict[str, Any]) -> float:
     """Área geométrica en la proyección equivalente continental."""
 

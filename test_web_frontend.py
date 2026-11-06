@@ -18,7 +18,17 @@ class WebFrontendTests(unittest.TestCase):
         self.assertIn("geoportal-513817", html)
         self.assertIn("DM+Sans", html)
         self.assertIn('id="home-map"', html)
+        self.assertIn('id="territory-query"', html)
         self.assertIn('class="skip-link"', html)
+
+    def test_territorial_panel_has_real_data_tabs_and_no_prefilled_science(self):
+        html = self.client.get("/panel").get_data(as_text=True)
+        self.assertIn('id="panel-search"', html)
+        self.assertIn('id="panel-map"', html)
+        self.assertIn("Concordancia JRC + ESRI", html)
+        javascript = (ROOT / "webapp" / "static" / "js" / "panel.js").read_text(encoding="utf-8")
+        self.assertIn("notCalculated", javascript)
+        self.assertNotIn("Math.random", javascript)
 
     def test_platform_contains_three_columns_and_four_step_modal(self):
         html = self.client.get("/platform").get_data(as_text=True)
@@ -40,6 +50,9 @@ class WebFrontendTests(unittest.TestCase):
         self.assertIn("/api/v1/analyses", javascript)
         self.assertIn("/api/v1/eri", javascript)
         self.assertIn("/download.zip", javascript)
+        self.assertIn("integratedResultViews", javascript)
+        self.assertIn("concordanceState", javascript)
+        self.assertIn("/api/v1/catalog/sources", javascript)
         self.assertNotIn("Math.random", javascript)
 
     def test_original_css_is_preserved_and_extended(self):

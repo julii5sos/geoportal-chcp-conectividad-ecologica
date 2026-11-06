@@ -21,8 +21,9 @@
       <a class="wm" href="{{ url_for('index') }}" aria-label="Inicio · Geoportal CHCP">{{ logo() }}<span><b>Geoportal CHCP</b><small>Conectividad ecológica</small></span></a>
       <nav class="links" id="links" aria-label="Secciones principales">
         <a href="{{ url_for('index') }}"{% if active == 'home' %} aria-current="page"{% endif %}>Conoce la herramienta</a>
+        <a href="{{ url_for('panel') }}"{% if active == 'panel' %} aria-current="page"{% endif %}>Panel</a>
         <a href="{{ url_for('platform') }}"{% if active == 'platform' %} aria-current="page"{% endif %}>Plataforma</a>
-        <a href="{{ url_for('methodology') }}"{% if active == 'methodology' %} aria-current="page"{% endif %}>Uso de datos</a>
+        <a href="{{ url_for('methodology') }}#sources"{% if active == 'methodology' %} aria-current="page"{% endif %}>Uso de datos</a>
         <a href="{{ url_for('about') }}"{% if active == 'about' %} aria-current="page"{% endif %}>Acerca</a>
       </nav>
       <div class="nav-btns">

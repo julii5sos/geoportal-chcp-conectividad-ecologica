@@ -22,8 +22,10 @@ from webapp.service import (
     configuration,
     run_analysis,
     run_eri,
+    source_catalog,
     territory_payload,
 )
+from territorio_busqueda import buscar_territorios, resumen_territorial
 
 
 ROOT = Path(__file__).resolve().parent
@@ -165,6 +167,15 @@ def create_app(*, testing: bool = False) -> Flask:
             app_page=True,
         )
 
+    @app.get("/panel")
+    def panel():
+        return render_template(
+            "panel.html",
+            active="panel",
+            project_id=resolver_proyecto_gee(),
+            use_map=True,
+        )
+
     @app.get("/methodology")
     def methodology():
         return render_template("methodology.html", active="methodology")
@@ -189,6 +200,22 @@ def create_app(*, testing: bool = False) -> Flask:
     @app.get("/api/v1/territory")
     def api_territory():
         return jsonify(territory_payload())
+
+    @app.get("/api/v1/territories/search")
+    def api_territory_search():
+        query = request.args.get("q", "")[:160]
+        return jsonify(query=query, results=buscar_territorios(query))
+
+    @app.get("/api/v1/territories/<path:identifier>/summary")
+    def api_territory_summary(identifier: str):
+        try:
+            return jsonify(resumen_territorial(identifier))
+        except KeyError:
+            return jsonify(error="El territorio no existe.", code="not_found"), 404
+
+    @app.get("/api/v1/catalog/sources")
+    def api_source_catalog():
+        return jsonify(source_catalog())
 
     @app.post("/api/v1/analyses")
     def api_analysis():

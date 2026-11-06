@@ -24,6 +24,8 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.json["sources"]["jrc_tmf"]["years"][0], 1990)
         self.assertEqual(response.json["sources"]["jrc_tmf"]["years"][-1], 2025)
         self.assertEqual(response.json["sources"]["esri_lulc"]["years"], list(range(2017, 2026)))
+        self.assertEqual(response.json["sources"]["integrated"]["years"], list(range(2017, 2026)))
+        self.assertIn("concordancia_estado", response.json["symbology"])
         self.assertEqual(
             response.json["eri"]["weights"],
             {
@@ -41,6 +43,36 @@ class WebApiTests(unittest.TestCase):
         self.assertGreater(len(response.json["subbasins"]["features"]), 10)
         self.assertGreater(len(response.json["corridors"]["features"]), 0)
         self.assertGreater(len(response.json["critical_points"]["features"]), 0)
+
+    def test_search_summary_and_source_catalog_are_traceable(self):
+        search = self.client.get("/api/v1/territories/search?q=miraflores")
+        self.assertEqual(search.status_code, 200)
+        self.assertTrue(any("Miraflores" in item["nombre"] for item in search.json["results"]))
+        identifier = search.json["results"][0]["id"]
+        summary = self.client.get(f"/api/v1/territories/{identifier}/summary")
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary.json["scientific_indicators"]["status"], "not_calculated")
+        catalog = self.client.get("/api/v1/catalog/sources")
+        self.assertEqual(catalog.status_code, 200)
+        by_key = {item["clave"]: item for item in catalog.json["sources"]}
+        self.assertEqual(by_key["jrc_tmf"]["estado_html"], "Integrada y operativa")
+        self.assertEqual(by_key["sinia_1992_2000"]["estado_html"], "No disponible")
+
+    @patch("webapp.main.run_analysis")
+    def test_integrated_analysis_is_accepted_by_contract(self, run_analysis):
+        run_analysis.return_value = {"result_id": "c" * 32, "kind": "integrated_analysis"}
+        response = self.client.post(
+            "/api/v1/analyses",
+            json={
+                "analyses": ["coverage", "fragmentation", "connectivity"],
+                "area": {"mode": "basin"},
+                "source": "integrated",
+                "initial_year": 2020,
+                "final_year": 2025,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["kind"], "integrated_analysis")
 
     def test_analysis_request_is_validated_before_engine(self):
         response = self.client.post(

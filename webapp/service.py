@@ -23,9 +23,16 @@ from analisis_temporal import (
     normalizar_area_geojson,
     recortar_area_a_cuenca,
 )
+from analisis_integrado import (
+    ANIO_FINAL_COMUN,
+    ANIO_INICIAL_COMUN,
+    ejecutar_analisis_integrado_ee,
+)
+from catalogo_multifuente import catalogo_por_categoria, matriz_trazabilidad
 from corredores import cargar_corredores, cargar_puntos_criticos
 from eri_gee import calcular_eri_geojson
 from gee_config import inicializar_earth_engine, resolver_proyecto_gee
+from simbologia_geoportal import catalogo_simbologia
 from territorio_local import (
     coleccion_subcuencas,
     geometria_cuenca,
@@ -118,15 +125,27 @@ def resolve_area(selection: AreaSelection) -> tuple[dict[str, Any], dict[str, An
 
 
 def configuration() -> dict[str, Any]:
+    sources = {
+        key: {
+            **asdict(source),
+            "years": list(source.anios),
+        }
+        for key, source in FUENTES_TEMPORALES.items()
+    }
+    sources["integrated"] = {
+        "clave": "integrated",
+        "nombre": "Concordancia JRC TMF + ESRI LULC",
+        "anio_inicial": ANIO_INICIAL_COMUN,
+        "anio_final": ANIO_FINAL_COMUN,
+        "resolucion_m": 30,
+        "years": list(range(ANIO_INICIAL_COMUN, ANIO_FINAL_COMUN + 1)),
+        "definicion_bosque": "Compara ambas definiciones sin fusionarlas ni promediarlas.",
+        "limitacion": "La concordancia entre productos no constituye validación independiente de campo.",
+        "prioridad": "Modalidad integrada de comparación",
+    }
     return {
         "project_id": resolver_proyecto_gee(),
-        "sources": {
-            key: {
-                **asdict(source),
-                "years": list(source.anios),
-            }
-            for key, source in FUENTES_TEMPORALES.items()
-        },
+        "sources": sources,
         "analyses": [
             {
                 "key": "coverage",
@@ -159,6 +178,22 @@ def configuration() -> dict[str, Any]:
                 "proximidad_riparia": 0.20,
             },
         },
+        "symbology": catalogo_simbologia(),
+    }
+
+
+def source_catalog() -> dict[str, Any]:
+    return {
+        "sources": matriz_trazabilidad(),
+        "categories": catalogo_por_categoria(),
+        "states": [
+            "Integrada y operativa",
+            "Integrada parcialmente",
+            "Disponible pero no conectada",
+            "Pendiente de permisos o migración",
+            "No disponible",
+            "Descartada justificadamente",
+        ],
     }
 
 
@@ -200,17 +235,27 @@ def run_analysis(request: AnalysisRequest) -> dict[str, Any]:
 
     def operation() -> dict[str, Any]:
         project = _initialize_ee()
-        result = ejecutar_analisis_temporal_ee(
-            fuente=request.source,
-            anio_inicial=request.initial_year,
-            anio_final=request.final_year,
-            area_geojson=geometry,
-            distancia_maxima_m=request.maximum_distance_m,
-            area_minima_parche_ha=request.minimum_patch_area_ha,
-            ee_module=ee,
-        )
+        if request.source == "integrated":
+            result = ejecutar_analisis_integrado_ee(
+                anio_inicial=request.initial_year,
+                anio_final=request.final_year,
+                area_geojson=geometry,
+                distancia_maxima_m=request.maximum_distance_m,
+                area_minima_parche_ha=request.minimum_patch_area_ha,
+                ee_module=ee,
+            )
+        else:
+            result = ejecutar_analisis_temporal_ee(
+                fuente=request.source,
+                anio_inicial=request.initial_year,
+                anio_final=request.final_year,
+                area_geojson=geometry,
+                distancia_maxima_m=request.maximum_distance_m,
+                area_minima_parche_ha=request.minimum_patch_area_ha,
+                ee_module=ee,
+            )
         return {
-            "kind": "temporal_analysis",
+            "kind": "integrated_analysis" if request.source == "integrated" else "temporal_analysis",
             "project_id": project,
             "selected_analyses": request.analyses,
             "area": {**area, "geometry": geometry},
@@ -219,7 +264,7 @@ def run_analysis(request: AnalysisRequest) -> dict[str, Any]:
                 "Resultado indicativo: requiere interpretación y verificación de campo.",
                 "La conectividad calculada es estructural y no demuestra movimiento de fauna.",
                 "JRC y ESRI conservan definiciones de bosque diferentes y no se mezclan.",
-            ],
+            ] + (result.get("warnings", []) if request.source == "integrated" else []),
         }
 
     item, cache_hit = _CACHE.run_once(payload, operation)
@@ -261,7 +306,20 @@ def build_download(identifier: str) -> bytes | None:
     item = cached_result(identifier)
     if item is None:
         return None
-    value = item.value
+    value = copy.deepcopy(item.value)
+
+    def remove_ephemeral_urls(content: Any) -> Any:
+        if isinstance(content, dict):
+            return {
+                key: remove_ephemeral_urls(child)
+                for key, child in content.items()
+                if key != "tile_url"
+            }
+        if isinstance(content, list):
+            return [remove_ephemeral_urls(child) for child in content]
+        return content
+
+    value = remove_ephemeral_urls(value)
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(
@@ -281,12 +339,23 @@ def build_download(identifier: str) -> bytes | None:
                     f"transicion_{key}.geojson",
                     json.dumps(transition["geojson"], ensure_ascii=False, indent=2),
                 )
+        if result.get("mode") == "integrated":
+            archive.writestr(
+                "concordancia_resumen.json",
+                json.dumps(result.get("concordance", {}), ensure_ascii=False, indent=2),
+            )
+            for source_key, source_result in (result.get("sources") or {}).items():
+                archive.writestr(
+                    f"fuente_{source_key}_resultado.json",
+                    json.dumps(source_result, ensure_ascii=False, indent=2),
+                )
         archive.writestr(
             "METODOLOGIA.txt",
             (
                 "Geoportal CHCP 2.0\n"
                 "Los cálculos reutilizan analisis_temporal.py y bosque_conectividad.py.\n"
                 "El ERI permanece separado de las métricas temporales.\n"
+                "La modalidad integrada calcula JRC y ESRI por separado y compara su concordancia; no fusiona productos.\n"
                 "Consulte docs/METODOLOGIA_ANALISIS_TEMPORAL.md para las limitaciones.\n"
             ),
         )

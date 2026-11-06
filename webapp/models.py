@@ -28,7 +28,7 @@ class AreaSelection(BaseModel):
 class AnalysisRequest(BaseModel):
     analyses: list[AnalysisKind] = Field(min_length=1, max_length=3)
     area: AreaSelection
-    source: Literal["jrc_tmf", "esri_lulc"] = "jrc_tmf"
+    source: Literal["jrc_tmf", "esri_lulc", "integrated"] = "jrc_tmf"
     initial_year: int
     final_year: int
     maximum_distance_m: float = Field(default=500, ge=50, le=5000)

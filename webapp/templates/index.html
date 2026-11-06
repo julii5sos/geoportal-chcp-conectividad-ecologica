@@ -4,7 +4,16 @@
 {% block body %}
 <main>
   {% call hero('Conectividad ecológica de la Cuenca del Canal de Panamá', 'Explore evidencia forestal, compare dos años y calcule fragmentación y conectividad estructural con fuentes verificables de Google Earth Engine.') %}
-    <a class="btn btn-w" href="{{ url_for('platform') }}">Abrir la plataforma</a>
+    <div class="territory-search" id="territory-search">
+      <label for="territory-query">Buscar cuenca o subcuenca</label>
+      <div class="territory-search-box">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+        <input id="territory-query" type="search" autocomplete="off" placeholder="Ejemplo: Miraflores, Chagres o CHCP" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="territory-results">
+        <span class="search-spinner" id="territory-search-spinner" hidden aria-hidden="true"></span>
+      </div>
+      <div class="territory-results" id="territory-results" role="listbox" hidden></div>
+      <p class="territory-search-status" id="territory-search-status" role="status">Busque entre la CHCP y {{ subbasin_count }} subcuencas reales.</p>
+    </div>
     <a class="btn btn-o" href="{{ url_for('methodology') }}">Conocer el método</a>
   {% endcall %}
   <section class="sec home-summary">
