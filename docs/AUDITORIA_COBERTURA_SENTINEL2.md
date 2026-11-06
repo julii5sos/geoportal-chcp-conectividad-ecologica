@@ -293,7 +293,7 @@ python -m unittest test_analisis_temporal -v
 
 ```powershell
 $env:RUN_EE_INTEGRATION="1"
-$env:EE_PROJECT="SU_PROYECTO_AUTORIZADO"
+$env:GEE_PROJECT_ID="geoportal-513817"
 python -m unittest test_analisis_temporal_ee -v
 ```
 

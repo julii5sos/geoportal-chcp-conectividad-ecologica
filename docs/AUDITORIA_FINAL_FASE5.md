@@ -156,8 +156,9 @@ como deuda técnica.
 - Dependencias declaradas y versión Streamlit compatible fijada.
 - `.streamlit/secrets.toml`, `.env`, claves y credenciales no están versionados.
 - El README usa únicamente marcadores de ejemplo para la cuenta de servicio.
-- `EE_SERVICE_ACCOUNT_JSON` y `EE_PROJECT` son el mecanismo previsto para Community
-  Cloud; las credenciales locales solo se usan en desarrollo.
+- `GEE_SERVICE_ACCOUNT_JSON` y `GEE_PROJECT_ID` son el mecanismo previsto para
+  Community Cloud; los alias anteriores se aceptan solo durante la migración y las
+  credenciales locales solo se usan en desarrollo.
 - `app.py` es el punto de entrada y enruta `Comparar` hacia `app_temporal.py`.
 
 ### Rendimiento y límites

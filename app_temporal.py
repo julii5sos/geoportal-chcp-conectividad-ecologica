@@ -8,12 +8,10 @@ import json
 import zipfile
 from pathlib import Path
 
-import altair as alt
 import ee
 import folium
 import streamlit as st
 from folium.plugins import Draw, Fullscreen
-from google.oauth2 import service_account
 from streamlit.errors import StreamlitSecretNotFoundError
 from streamlit_folium import st_folium
 
@@ -22,6 +20,7 @@ from analisis_temporal import (
     ejecutar_analisis_temporal_ee,
     recortar_area_a_cuenca,
 )
+from gee_config import inicializar_earth_engine
 from territorio_local import (
     coleccion_cuenca,
     coleccion_subcuencas,
@@ -37,13 +36,12 @@ from interfaz_html_definitiva import (
     configurar_asistente_inicial,
     stepper_html,
 )
+from panel_estadistico import renderizar_panel_estadistico
 
 
 AZUL = "#0A4393"
 AZUL_OSCURO = "#062A5E"
 VERDE = "#77CC09"
-JRC = "#1F8A70"
-ESRI = "#3A7CA5"
 PERDIDA = "#D0442C"
 GANANCIA = "#43AA8B"
 ESTABLE = "#2E7D32"
@@ -108,27 +106,14 @@ def _secreto(nombre: str, predeterminado=None):
 def iniciar_earth_engine_temporal():
     """Inicializa EE con secretos de despliegue o credenciales locales existentes."""
 
-    proyecto = _secreto("EE_PROJECT", "ee-julissaguevaravega")
-    secreto = _secreto("EE_SERVICE_ACCOUNT_JSON")
-    if secreto is not None:
-        informacion = json.loads(secreto) if isinstance(secreto, str) else dict(secreto)
-        credenciales = service_account.Credentials.from_service_account_info(
-            informacion,
-            scopes=[
-                "https://www.googleapis.com/auth/earthengine",
-                "https://www.googleapis.com/auth/cloud-platform",
-            ],
-        )
-        ee.Initialize(credentials=credenciales, project=proyecto)
-    else:
-        try:
-            ee.Initialize(project=proyecto)
-        except Exception as exc:
-            raise RuntimeError(
-                "Earth Engine no está autorizado en este entorno. Configure "
-                "EE_SERVICE_ACCOUNT_JSON y EE_PROJECT, o autentique la sesión local."
-            ) from exc
-    return True
+    try:
+        return inicializar_earth_engine(ee, secret_getter=_secreto)
+    except Exception as exc:
+        raise RuntimeError(
+            "Earth Engine no está autorizado para GEE_PROJECT_ID. Configure "
+            "GEE_SERVICE_ACCOUNT_JSON en el servidor o autentique explícitamente "
+            "la cuenta local correcta."
+        ) from exc
 
 
 @st.cache_data(ttl=3600, max_entries=12, show_spinner=False)
@@ -329,47 +314,6 @@ def crear_mapa_transiciones(resultado: dict, mapa_base: str) -> folium.Map:
     return mapa
 
 
-def _grafica_barras(valores: list[dict], campo: str, titulo: str, color: str):
-    return (
-        alt.Chart(alt.Data(values=valores))
-        .mark_bar(size=48, cornerRadiusTopLeft=4, cornerRadiusTopRight=4, color=color)
-        .encode(
-            x=alt.X("Año:N", sort=None, axis=alt.Axis(labelAngle=0, title=None)),
-            y=alt.Y(f"{campo}:Q", title=titulo),
-            tooltip=["Año:N", alt.Tooltip(f"{campo}:Q", format=",.2f")],
-        )
-        .properties(height=260)
-    )
-
-
-def _grafica_red(valores: list[dict]):
-    largos = []
-    colores = {
-        "Parches": "#1F8A70",
-        "Parches aislados": "#D0442C",
-        "Componentes": "#3A7CA5",
-    }
-    for fila in valores:
-        for metrica in colores:
-            largos.append({"Año": str(fila["Año"]), "Métrica": metrica, "Valor": fila[metrica]})
-    return (
-        alt.Chart(alt.Data(values=largos))
-        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-        .encode(
-            x=alt.X("Año:N", sort=None, axis=alt.Axis(labelAngle=0, title=None)),
-            xOffset="Métrica:N",
-            y=alt.Y("Valor:Q", title="Conteo"),
-            color=alt.Color(
-                "Métrica:N",
-                scale=alt.Scale(domain=list(colores), range=list(colores.values())),
-                legend=alt.Legend(orient="bottom"),
-            ),
-            tooltip=["Año:N", "Métrica:N", alt.Tooltip("Valor:Q", format=",.0f")],
-        )
-        .properties(height=260)
-    )
-
-
 def preparar_descarga_zip(resultado: dict) -> bytes:
     memoria = io.BytesIO()
     with zipfile.ZipFile(memoria, "w", zipfile.ZIP_DEFLATED) as archivo:
@@ -382,6 +326,8 @@ def preparar_descarga_zip(resultado: dict) -> bytes:
             "transiciones_ha": {
                 clave: valor["area_ha"] for clave, valor in resultado["transiciones"].items()
             },
+            "estadisticas_cobertura": resultado["estadisticas_cobertura"],
+            "interpretacion_ecologica": resultado["interpretacion_ecologica"],
             "metadatos": resultado["metadatos"],
         }
         archivo.writestr(
@@ -399,6 +345,38 @@ def preparar_descarga_zip(resultado: dict) -> bytes:
                 {"anio": anio, **resultado["periodos"][str(anio)]["resumen"]}
             )
         archivo.writestr("estadisticas_comparativas.csv", csv_memoria.getvalue())
+        cobertura_memoria = io.StringIO()
+        campos_cobertura = [
+            "anio",
+            "area_geometrica_ha",
+            "area_valida_ha",
+            "bosque_ha",
+            "no_bosque_ha",
+            "sin_datos_ha",
+            "porcentaje_bosque",
+            "porcentaje_no_bosque",
+        ]
+        escritor_cobertura = csv.DictWriter(
+            cobertura_memoria, fieldnames=campos_cobertura
+        )
+        escritor_cobertura.writeheader()
+        for anio in (resultado["anio_inicial"], resultado["anio_final"]):
+            periodo = resultado["estadisticas_cobertura"]["periodos"][str(anio)]
+            escritor_cobertura.writerow(
+                {campo: periodo.get(campo) for campo in campos_cobertura}
+            )
+        archivo.writestr(
+            "cobertura_valida_por_periodo.csv", cobertura_memoria.getvalue()
+        )
+        comparacion_memoria = io.StringIO()
+        escritor_comparacion = csv.writer(comparacion_memoria)
+        escritor_comparacion.writerow(["indicador", "valor"])
+        for clave, valor in resultado["estadisticas_cobertura"]["comparacion"].items():
+            if not isinstance(valor, dict):
+                escritor_comparacion.writerow([clave, valor])
+        archivo.writestr(
+            "transiciones_mascara_comun.csv", comparacion_memoria.getvalue()
+        )
         for anio in (resultado["anio_inicial"], resultado["anio_final"]):
             periodo = resultado["periodos"][str(anio)]
             archivo.writestr(
@@ -712,44 +690,10 @@ with col_resultado:
             unsafe_allow_html=True,
         )
     else:
-        resumen_i = resultado["periodos"][str(configuracion.anio_inicial)]["resumen"]
-        resumen_f = resultado["periodos"][str(configuracion.anio_final)]["resumen"]
-        cambios = resultado["cambios"]
-        transiciones = resultado["transiciones"]
-        clase_delta = "fase4-delta-pos" if cambios["superficie_bosque_ha"] >= 0 else "fase4-delta-neg"
-        st.markdown(
-            f"""<div class="fase4-res-body">
-            <div class="fase4-big"><small>Superficie forestal {configuracion.anio_final}</small><strong>{resumen_f['superficie_bosque_ha']:,.1f} ha</strong><span class="{clase_delta}">{cambios['superficie_bosque_ha']:+,.1f} ha</span></div>
-            <div class="fase4-cards">
-              <div class="fase4-mc"><small>Parches</small><strong>{resumen_f['numero_parches']:,}</strong></div>
-              <div class="fase4-mc"><small>Aislados</small><strong>{resumen_f['parches_aislados']:,}</strong></div>
-              <div class="fase4-mc"><small>Componentes</small><strong>{resumen_f['numero_componentes']:,}</strong></div>
-              <div class="fase4-mc"><small>Pérdida</small><strong>{transiciones['perdida_bosque']['area_ha']:,.1f} ha</strong></div>
-            </div></div>""",
-            unsafe_allow_html=True,
-        )
-        valores = [
-            {"Año": str(anio), "Bosque (ha)": resultado["periodos"][str(anio)]["resumen"]["superficie_bosque_ha"], "Parches": resultado["periodos"][str(anio)]["resumen"]["numero_parches"], "Parches aislados": resultado["periodos"][str(anio)]["resumen"]["parches_aislados"], "Componentes": resultado["periodos"][str(anio)]["resumen"]["numero_componentes"]}
-            for anio in (configuracion.anio_inicial, configuracion.anio_final)
-        ]
-        st.markdown('<div class="fase4-chart-title">Comparación entre períodos</div>', unsafe_allow_html=True)
-        if configuracion.tipo == "cobertura":
-            grafica = _grafica_barras(valores, "Bosque (ha)", "Superficie forestal (ha)", JRC if configuracion.fuente == "jrc_tmf" else ESRI)
-        else:
-            grafica = _grafica_red(valores)
-        st.altair_chart(grafica, width="stretch", theme=None)
-        st.markdown('<div class="fase4-warning">Conectividad estructural potencial. Los resultados requieren interpretación y no demuestran movimiento de fauna.</div>', unsafe_allow_html=True)
-        with st.expander("Método y valores", expanded=False):
-            st.dataframe(valores, hide_index=True, width="stretch")
-            especificacion = FUENTES_TEMPORALES[configuracion.fuente]
-            st.caption(f"{especificacion.version} · {especificacion.resolucion_m} m. {especificacion.definicion_bosque}")
-        st.download_button(
-            "Descargar resultados",
-            data=descarga_zip,
-            file_name=f"analisis_temporal_{configuracion.fuente}_{configuracion.anio_inicial}_{configuracion.anio_final}.zip",
-            mime="application/zip",
-            type="primary",
-            use_container_width=True,
+        renderizar_panel_estadistico(
+            resultado,
+            tipo_analisis=configuracion.tipo,
+            descarga_zip=descarga_zip,
         )
 
 if ejecutar:

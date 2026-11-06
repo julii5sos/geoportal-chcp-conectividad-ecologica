@@ -6,13 +6,18 @@ Fecha de ejecución: 4 de noviembre de 2026, zona horaria de Panamá.
 
 ```powershell
 python scripts/validar_analisis_temporal.py `
-  --project ee-julissaguevaravega `
+  --project geoportal-513817 `
   --fuente jrc_tmf `
   --inicial 2020 `
   --final 2025 `
   --distancia 500 `
   --area-minima 0.1
 ```
+
+La tabla inferior conserva los resultados de la ejecución histórica del 4 de noviembre
+de 2026. El cambio del identificador de proyecto no altera la fuente pública JRC ni las
+fórmulas; una nueva ejecución requiere que la identidad local tenga permiso para usar
+`geoportal-513817`.
 
 Área de validación: rectángulo `[-79.57, 9.03]` a `[-79.55, 9.05]`, dentro de la CHCP.
 Fuente: `projects/JRC/TMF/v1_2025/AnnualChanges`, resolución 30 m. Se consideran bosque

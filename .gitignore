@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 .audit_deps/
 .audit_streamlit163/
+.test_deps/
 uploads/
 *.zip
 *.log

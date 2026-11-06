@@ -161,23 +161,33 @@ el ERI conserva su carácter complementario y no modifica la prioridad territori
 
 ## Configuración de Earth Engine
 
-Guarde los secretos únicamente en `.streamlit/secrets.toml` para desarrollo local o en **App settings > Secrets** al desplegar:
+El proyecto de cuota configurado por defecto es `geoportal-513817`. Puede
+declararlo explícitamente mediante la variable de entorno `GEE_PROJECT_ID` o en
+`.streamlit/secrets.toml`. El alias anterior `EE_PROJECT` se acepta solo para
+facilitar la migración.
 
-```toml
-EE_PROJECT = "proyecto-de-earth-engine"
-EE_ASSET_BOSQUE_2021 = "projects/ee-julissaguevaravega/assets/CBOTB_2021_25k"
+Para desarrollo local autentique de forma explícita la cuenta de Google que
+corresponda. Las credenciales OAuth permanecen fuera del repositorio:
 
-EE_SERVICE_ACCOUNT_JSON = '''
-{
-  "type": "service_account",
-  "project_id": "proyecto-de-earth-engine",
-  "private_key": "CLAVE_PRIVADA_COMPLETA",
-  "client_email": "cuenta-de-servicio@proyecto.iam.gserviceaccount.com"
-}
-'''
+```powershell
+$env:GEE_PROJECT_ID = "geoportal-513817"
+earthengine authenticate --force --auth_mode=localhost
+python scripts/verificar_conexion_gee.py --project geoportal-513817 --jrc
 ```
 
-Nunca confirme en Git el JSON real de la cuenta de servicio, las direcciones privadas de los assets, el código de acceso ni el shapefile nacional.
+Guarde la configuración no sensible en `.streamlit/secrets.toml` o en
+**App settings > Secrets** al desplegar:
+
+```toml
+GEE_PROJECT_ID = "geoportal-513817"
+# EE_ASSET_BOSQUE_2021 = "projects/geoportal-513817/assets/CBOTB_2021_25k"
+```
+
+En Streamlit Cloud configure `GEE_SERVICE_ACCOUNT_JSON` únicamente en el panel
+de secretos. El inicializador rechaza una cuenta de servicio cuyo `project_id`
+no coincida con `GEE_PROJECT_ID`. Nunca confirme en Git el JSON real, una clave
+privada, las direcciones privadas de los assets, el código de acceso ni el
+shapefile nacional.
 
 ### Publicar la cobertura de bosque una sola vez
 
@@ -185,7 +195,7 @@ Esta tarea corresponde a la administración, no a las personas que consultan la 
 
 1. Use `CBOTB_2021_25k.zip`, que contiene un único shapefile completo con `.shp`, `.shx`, `.dbf`, `.prj` y `.cpg`. Si prepara una copia normalizada, se recomienda EPSG:4326.
 2. En **Earth Engine > Assets**, seleccione **NEW > Table upload** y cargue el ZIP.
-3. Use una ruta estable, por ejemplo `projects/ee-julissaguevaravega/assets/CBOTB_2021_25k`.
+3. Use una ruta estable, por ejemplo `projects/geoportal-513817/assets/CBOTB_2021_25k`.
 4. Verifique que la cuenta de servicio de Streamlit pueda leer el asset.
 5. Copie la ruta completa en el secreto `EE_ASSET_BOSQUE_2021` y reinicie la aplicación.
 

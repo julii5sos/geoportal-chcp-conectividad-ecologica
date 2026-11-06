@@ -83,6 +83,6 @@ La interfaz no ofrece estas fuentes para el recálculo temporal de fragmentació
 - Las pruebas sintéticas construyen polígonos en `EPSG:8857` con áreas y separaciones
   conocidas y comprueban superficie, pérdida, parches, componentes y aislamiento.
 - Las pruebas de integración verifican JRC y ESRI 2020–2025 cuando
-  `RUN_EE_INTEGRATION=1` y `EE_PROJECT` están configurados.
+  `RUN_EE_INTEGRATION=1` y `GEE_PROJECT_ID` están configurados.
 - `scripts/validar_analisis_temporal.py` ejecuta el flujo completo sobre una ventana
   pequeña dentro de la CHCP y emite un resumen JSON reproducible.

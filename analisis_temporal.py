@@ -13,6 +13,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from bosque_conectividad import analizar_fragmentacion_geojson
+from estadisticas_temporales import (
+    construir_estadisticas_cobertura,
+    generar_interpretacion_ecologica,
+)
 
 
 TMF_ASSET = "projects/JRC/TMF/v1_2025/AnnualChanges"
@@ -121,6 +125,65 @@ def _ee(ee_module=None):
     return ee
 
 
+def _estado_y_mascara_valida_ee(
+    fuente: str,
+    anio: int,
+    geometria,
+    *,
+    ee_module=None,
+):
+    """Recupera la clase original y define qué píxeles son comparables.
+
+    JRC usa 1–6 en la colección anual; el cero queda fuera del dominio TMF.
+    ESRI usa sus valores originales y la clase 10 representa nubes persistentes,
+    por lo que se excluye junto con valores desconocidos o enmascarados.
+    """
+
+    especificacion = obtener_fuente_temporal(fuente)
+    if int(anio) not in especificacion.anios:
+        raise ValueError(
+            f"{especificacion.nombre} no dispone de cobertura comparable para {anio}."
+        )
+    ee = _ee(ee_module)
+    geometria = ee.Geometry(geometria)
+    if fuente == "jrc_tmf":
+        banda = f"Dec{anio}"
+        coleccion = (
+            ee.ImageCollection(especificacion.asset_id)
+            .filterBounds(geometria)
+            .select([banda], ["estado"])
+        )
+        referencia = ee.Image(coleccion.first()).select("estado")
+        estado = (
+            coleccion.mosaic()
+            .setDefaultProjection(referencia.projection())
+            .rename("estado")
+            .clip(geometria)
+        )
+        valida = estado.gte(1).And(estado.lte(6))
+    elif fuente == "esri_lulc":
+        coleccion = (
+            ee.ImageCollection(especificacion.asset_id)
+            .filterDate(f"{anio}-01-01", f"{anio}-12-31")
+            .filterBounds(geometria)
+            .select([0], ["clase"])
+        )
+        referencia = ee.Image(coleccion.first()).select("clase")
+        estado = (
+            coleccion.mosaic()
+            .setDefaultProjection(referencia.projection())
+            .rename("clase")
+            .clip(geometria)
+        )
+        valores_validos = [1, 2, 4, 5, 7, 8, 9, 11]
+        valida = estado.remap(
+            valores_validos, [1] * len(valores_validos), 0
+        ).eq(1)
+    else:
+        raise ValueError(f"No existe una regla bosque/no bosque para {fuente}.")
+    return estado, valida.rename(f"valida_{anio}").toByte()
+
+
 def construir_cobertura_bosque_ee(
     fuente: str,
     anio: int,
@@ -139,46 +202,20 @@ def construir_cobertura_bosque_ee(
         raise ValueError(
             f"{especificacion.nombre} no dispone de cobertura comparable para {anio}."
         )
-    ee = _ee(ee_module)
-    geometria = ee.Geometry(geometria)
-
-    if fuente == "jrc_tmf":
-        banda = f"Dec{anio}"
-        coleccion = (
-            ee.ImageCollection(especificacion.asset_id)
-            .filterBounds(geometria)
-            .select([banda], ["estado"])
-        )
-        referencia = ee.Image(coleccion.first()).select("estado")
-        estado = (
-            coleccion.mosaic()
-            .setDefaultProjection(referencia.projection())
-            .rename("estado")
-            .clip(geometria)
-        )
-        bosque = estado.eq(1).Or(estado.eq(2)).Or(estado.eq(4))
-    elif fuente == "esri_lulc":
-        coleccion = (
-            ee.ImageCollection(especificacion.asset_id)
-            .filterDate(f"{anio}-01-01", f"{anio}-12-31")
-            .filterBounds(geometria)
-            .select([0], ["clase"])
-        )
-        referencia = ee.Image(coleccion.first()).select("clase")
-        estado = (
-            coleccion.mosaic()
-            .setDefaultProjection(referencia.projection())
-            .rename("clase")
-            .clip(geometria)
-        )
-        bosque = estado.eq(2)
-    else:  # La validación anterior hace explícito cualquier alta futura incompleta.
-        raise ValueError(f"No existe una regla bosque/no bosque para {fuente}.")
+    estado, valida = _estado_y_mascara_valida_ee(
+        fuente, anio, geometria, ee_module=ee_module
+    )
+    bosque = (
+        estado.eq(1).Or(estado.eq(2)).Or(estado.eq(4))
+        if fuente == "jrc_tmf"
+        else estado.eq(2)
+    )
 
     return (
         bosque.rename(f"bosque_{anio}")
         .toByte()
-        .updateMask(bosque)
+        .updateMask(valida)
+        .selfMask()
         .set(
             {
                 "fuente": especificacion.nombre,
@@ -188,6 +225,110 @@ def construir_cobertura_bosque_ee(
                 "definicion_bosque": especificacion.definicion_bosque,
             }
         )
+    )
+
+
+def _area_geojson_ha(area_geojson: dict[str, Any]) -> float:
+    """Área geométrica en la proyección equivalente continental."""
+
+    from pyproj import Transformer
+
+    a_m = Transformer.from_crs("EPSG:4326", CRS_METRICAS, always_xy=True)
+    area_m = _union_proyectada(normalizar_area_geojson(area_geojson), a_m.transform)
+    return float(area_m.area) / 10_000 if area_m is not None else 0.0
+
+
+def _perimetro_geojson_m(area_geojson: dict[str, Any]) -> float:
+    from pyproj import Transformer
+
+    a_m = Transformer.from_crs("EPSG:4326", CRS_METRICAS, always_xy=True)
+    area_m = _union_proyectada(normalizar_area_geojson(area_geojson), a_m.transform)
+    return float(area_m.length) if area_m is not None else 0.0
+
+
+def calcular_estadisticas_cobertura_ee(
+    *,
+    fuente: str,
+    anio_inicial: int,
+    anio_final: int,
+    area_geojson: dict[str, Any],
+    ee_module=None,
+) -> dict[str, Any]:
+    """Calcula cobertura y cuatro transiciones sobre máscaras válidas comunes."""
+
+    especificacion = obtener_fuente_temporal(fuente)
+    ee = _ee(ee_module)
+    geometria = ee.Geometry(area_geojson)
+    estado_i, valida_i = _estado_y_mascara_valida_ee(
+        fuente, anio_inicial, geometria, ee_module=ee
+    )
+    estado_f, valida_f = _estado_y_mascara_valida_ee(
+        fuente, anio_final, geometria, ee_module=ee
+    )
+    if fuente == "jrc_tmf":
+        bosque_i = estado_i.eq(1).Or(estado_i.eq(2)).Or(estado_i.eq(4))
+        bosque_f = estado_f.eq(1).Or(estado_f.eq(2)).Or(estado_f.eq(4))
+    else:
+        bosque_i = estado_i.eq(2)
+        bosque_f = estado_f.eq(2)
+    comun = valida_i.And(valida_f)
+    pixel_ha = ee.Image.pixelArea().divide(10_000)
+
+    def banda(nombre: str, condicion):
+        return pixel_ha.rename(nombre).updateMask(condicion)
+
+    bandas = [
+            banda("valida_inicial", valida_i),
+            banda("bosque_inicial", valida_i.And(bosque_i)),
+            banda("valida_final", valida_f),
+            banda("bosque_final", valida_f.And(bosque_f)),
+            banda("valida_comun", comun),
+            banda("bosque_estable", comun.And(bosque_i).And(bosque_f)),
+            banda("perdida_bosque", comun.And(bosque_i).And(bosque_f.Not())),
+            banda("ganancia_bosque", comun.And(bosque_i.Not()).And(bosque_f)),
+            banda(
+                "no_bosque_estable",
+                comun.And(bosque_i.Not()).And(bosque_f.Not()),
+            ),
+        ]
+    resumen = ee.Image.cat(*bandas).reduceRegion(
+        reducer=ee.Reducer.sum(),
+        geometry=geometria,
+        scale=int(especificacion.resolucion_m),
+        maxPixels=1e9,
+        tileScale=4,
+        bestEffort=False,
+    ).getInfo()
+
+    def valor(clave: str) -> float:
+        return float(resumen.get(clave) or 0.0)
+
+    tolerancia = max(
+        0.01,
+        especificacion.resolucion_m * especificacion.resolucion_m / 10_000,
+    )
+    tolerancia_borde = max(
+        tolerancia,
+        _perimetro_geojson_m(area_geojson)
+        * especificacion.resolucion_m
+        / 2
+        / 10_000,
+    )
+    return construir_estadisticas_cobertura(
+        anio_inicial=anio_inicial,
+        anio_final=anio_final,
+        area_geometrica_ha=_area_geojson_ha(area_geojson),
+        area_valida_inicial_ha=valor("valida_inicial"),
+        bosque_inicial_ha=valor("bosque_inicial"),
+        area_valida_final_ha=valor("valida_final"),
+        bosque_final_ha=valor("bosque_final"),
+        area_valida_comun_ha=valor("valida_comun"),
+        bosque_estable_ha=valor("bosque_estable"),
+        perdida_bosque_ha=valor("perdida_bosque"),
+        ganancia_bosque_ha=valor("ganancia_bosque"),
+        no_bosque_estable_ha=valor("no_bosque_estable"),
+        tolerancia_ha=tolerancia,
+        tolerancia_geometria_ha=tolerancia_borde,
     )
 
 
@@ -326,7 +467,7 @@ def calcular_transiciones_cobertura(
     cobertura_final: dict[str, Any],
     area_geojson: dict[str, Any],
 ) -> dict[str, Any]:
-    """Calcula bosque estable, pérdida y ganancia en una proyección equivalente."""
+    """Calcula las cuatro transiciones cuando toda el área es válida en ambos años."""
 
     from pyproj import Transformer
     from shapely.geometry import GeometryCollection, mapping
@@ -343,6 +484,7 @@ def calcular_transiciones_cobertura(
     estable_m = inicial_m.intersection(final_m)
     perdida_m = inicial_m.difference(final_m)
     ganancia_m = final_m.difference(inicial_m)
+    no_bosque_estable_m = area_m.difference(inicial_m.union(final_m))
 
     def partes_poligonales(geometria) -> list:
         """Devuelve solo superficies; Folium no calcula límites de GeometryCollection."""
@@ -383,6 +525,7 @@ def calcular_transiciones_cobertura(
         "bosque_estable": salida("Bosque estable", estable_m),
         "perdida_bosque": salida("Pérdida de bosque", perdida_m),
         "ganancia_bosque": salida("Ganancia de bosque", ganancia_m),
+        "no_bosque_estable": salida("No bosque estable", no_bosque_estable_m),
     }
 
 
@@ -394,10 +537,14 @@ def _resumen_periodo(resultado: dict[str, Any]) -> dict[str, float | int | bool]
         "porcentaje_bosque": clase["porcentaje_paisaje_bosque"],
         "numero_parches": clase["numero_parches"],
         "area_media_parche_ha": clase["area_media_parche_ha"],
+        "densidad_parches_por_100ha": clase["densidad_parches_por_100ha"],
         "indice_parche_mayor_pct": clase["indice_parche_mayor_pct"],
         "densidad_borde_m_ha": clase["densidad_borde_m_ha"],
         "parches_aislados": red["numero_parches_aislados"],
         "porcentaje_parches_aislados": red["porcentaje_parches_aislados"],
+        "porcentaje_parches_conectados": round(
+            100.0 - float(red["porcentaje_parches_aislados"]), 4
+        ) if clase["numero_parches"] else 0.0,
         "numero_componentes": red["numero_componentes"],
         "porcentaje_nodos_componente_mayor": red[
             "porcentaje_nodos_componente_mayor"
@@ -450,9 +597,14 @@ def analizar_comparacion_geojson(
         "porcentaje_bosque",
         "numero_parches",
         "area_media_parche_ha",
+        "densidad_parches_por_100ha",
+        "indice_parche_mayor_pct",
+        "densidad_borde_m_ha",
         "parches_aislados",
         "porcentaje_parches_aislados",
+        "porcentaje_parches_conectados",
         "numero_componentes",
+        "porcentaje_nodos_componente_mayor",
         "numero_aristas",
     )
     cambios = {
@@ -470,7 +622,32 @@ def analizar_comparacion_geojson(
         cobertura_analizada_final,
         area_geometria,
     )
-    return {
+    transiciones_cobertura = calcular_transiciones_cobertura(
+        cobertura_inicial,
+        cobertura_final,
+        area_geometria,
+    )
+    area_geometrica_ha = _area_geojson_ha(area_geometria)
+    estable_bruto = transiciones_cobertura["bosque_estable"]["area_ha"]
+    perdida_bruta = transiciones_cobertura["perdida_bosque"]["area_ha"]
+    ganancia_bruta = transiciones_cobertura["ganancia_bosque"]["area_ha"]
+    no_bosque_estable_bruto = transiciones_cobertura["no_bosque_estable"]["area_ha"]
+    estadisticas_cobertura = construir_estadisticas_cobertura(
+        anio_inicial=anio_inicial,
+        anio_final=anio_final,
+        area_geometrica_ha=area_geometrica_ha,
+        area_valida_inicial_ha=area_geometrica_ha,
+        bosque_inicial_ha=estable_bruto + perdida_bruta,
+        area_valida_final_ha=area_geometrica_ha,
+        bosque_final_ha=estable_bruto + ganancia_bruta,
+        area_valida_comun_ha=area_geometrica_ha,
+        bosque_estable_ha=estable_bruto,
+        perdida_bosque_ha=perdida_bruta,
+        ganancia_bosque_ha=ganancia_bruta,
+        no_bosque_estable_ha=no_bosque_estable_bruto,
+        tolerancia_ha=max(0.01, area_geometrica_ha * 1e-6),
+    )
+    resultado = {
         "fuente": asdict(especificacion),
         "anio_inicial": int(anio_inicial),
         "anio_final": int(anio_final),
@@ -496,6 +673,7 @@ def analizar_comparacion_geojson(
         },
         "cambios": cambios,
         "transiciones": transiciones,
+        "estadisticas_cobertura": estadisticas_cobertura,
         "metadatos": {
             "generado_utc": datetime.now(timezone.utc).isoformat(),
             "metodo": (
@@ -512,6 +690,8 @@ def analizar_comparacion_geojson(
             ),
         },
     }
+    resultado["interpretacion_ecologica"] = generar_interpretacion_ecologica(resultado)
+    return resultado
 
 
 def ejecutar_analisis_temporal_ee(
@@ -533,6 +713,13 @@ def ejecutar_analisis_temporal_ee(
         distancia_maxima_m,
         area_minima_parche_ha,
     )
+    estadisticas_cobertura = calcular_estadisticas_cobertura_ee(
+        fuente=fuente,
+        anio_inicial=anio_inicial,
+        anio_final=anio_final,
+        area_geojson=area_geojson,
+        ee_module=ee_module,
+    )
     cobertura_inicial = recuperar_cobertura_geojson_ee(
         fuente,
         anio_inicial,
@@ -547,7 +734,7 @@ def ejecutar_analisis_temporal_ee(
         area_minima_parche_ha=area_minima_parche_ha,
         ee_module=ee_module,
     )
-    return analizar_comparacion_geojson(
+    resultado = analizar_comparacion_geojson(
         fuente=fuente,
         anio_inicial=anio_inicial,
         anio_final=anio_final,
@@ -557,3 +744,10 @@ def ejecutar_analisis_temporal_ee(
         distancia_maxima_m=distancia_maxima_m,
         area_minima_parche_ha=area_minima_parche_ha,
     )
+    resultado["estadisticas_cobertura"] = estadisticas_cobertura
+    resultado["interpretacion_ecologica"] = generar_interpretacion_ecologica(resultado)
+    resultado["metadatos"]["estadisticas_cobertura"] = (
+        "Calculadas en raster a resolución nativa antes del filtro mínimo de parches; "
+        "NoData no se trata como no bosque y las transiciones usan la máscara válida común."
+    )
+    return resultado

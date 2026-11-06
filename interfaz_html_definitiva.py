@@ -111,15 +111,22 @@ CSS_FASE4 = r"""
 .fase4-res-h h2{margin:4px 0 0!important;color:#fff!important;font-size:20px!important;font-weight:600!important;line-height:1.2!important;}
 .fase4-res-h p{margin:5px 0 0;color:#dbe7f7;font-size:11px;}
 .fase4-res-body{padding:14px;background:#fff;}
+.st-key-fase4_panel_resultados{max-height:calc(100vh - 250px);overflow-y:auto;overscroll-behavior:contain;padding:0 6px 18px 0;scrollbar-gutter:stable;}
+.st-key-fase4_panel_resultados:focus-within{outline:2px solid rgba(10,67,147,.2);outline-offset:-2px;}
 .fase4-big{margin-bottom:10px;padding:14px;border-radius:var(--r);background:var(--azul-suave);}
 .fase4-big small,.fase4-mc small{display:block;color:var(--azul-medio);font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;}
 .fase4-big strong{display:block;margin-top:4px;color:var(--azul-tinta);font-size:23px;}
+.fase4-big span{display:block;margin-top:3px;color:var(--muted);font-size:11px;}
 .fase4-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
 .fase4-mc{min-height:78px;padding:11px;border:1px solid var(--azul-linea);border-radius:var(--r);background:#fff;}
 .fase4-mc strong{display:block;margin-top:5px;color:var(--azul-tinta);font-size:16px;line-height:1.2;}
+.fase4-mc span{display:block;margin-top:4px;color:var(--muted);font-size:10px;line-height:1.3;}
 .fase4-delta-neg{color:var(--rojo)!important}.fase4-delta-pos{color:#25864c!important}
 .fase4-chart-title{margin:12px 0 7px;color:var(--azul-tinta);font-size:12px;font-weight:800;}
 .fase4-warning{margin-top:10px;padding:10px 12px;border-left:4px solid var(--amarillo);background:#fff8e5;color:var(--muted);font-size:11px;line-height:1.45;}
+.st-key-fase4_panel_resultados [data-testid="stExpander"]{border-color:var(--azul-linea);border-radius:var(--r);background:#fff;}
+.st-key-fase4_panel_resultados [data-testid="stExpander"] summary{min-height:44px;color:var(--azul-tinta);font-size:12px;font-weight:700;}
+.st-key-fase4_panel_resultados [data-testid="stDownloadButton"] button{min-height:44px;}
 
 /* Modal de cuatro pasos: misma jerarquía que dlg/stp del HTML. */
 section[role="dialog"]{width:min(900px,calc(100vw - 32px))!important;max-width:900px!important;padding:0!important;border-radius:8px!important;overflow:hidden!important;}
@@ -151,6 +158,7 @@ div[role="dialog"] [data-testid="stDialogHeader"] h2{font-size:20px!important;fo
   .fase4-side-actions{width:min(340px,100vw);}
   .fase4-topline{align-items:flex-start;flex-direction:column;}
   .block-container:has(.fase4-plataforma) iframe[title="streamlit_folium.st_folium"]{height:66vh!important;min-height:480px!important;}
+  .st-key-fase4_panel_resultados{max-height:none;overflow:visible;padding-right:0;}
 }
 @media(max-width:640px){
   .fase4-stepper{display:grid;grid-template-columns:repeat(4,1fr);}
