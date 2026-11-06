@@ -1,0 +1,11 @@
+.git
+.github
+.test_deps
+.reference_html_original
+.streamlit/secrets.toml
+.env
+__pycache__
+*.pyc
+artifacts/screenshots
+docs/captura_*.png
+

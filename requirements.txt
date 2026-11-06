@@ -12,3 +12,6 @@ networkx>=3.2,<4
 pyproj>=3.6,<4
 pyshp>=2.3,<4
 shapely>=2.0,<3
+flask>=3.1,<4
+pydantic>=2.7,<3
+gunicorn>=23,<24; platform_system != "Windows"

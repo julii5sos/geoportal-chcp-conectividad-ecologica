@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hero %}
+{% block title %}Acerca · Geoportal CHCP 2.0{% endblock %}
+{% block body %}<main>{% call hero('Acerca del Geoportal CHCP 2.0', 'Una herramienta de preevaluación para convertir un área de interés en evidencia inicial reproducible.', small=True) %}<a class="btn btn-w" href="{{ url_for('platform') }}">Explorar datos</a>{% endcall %}<section class="sec"><div class="wrap prose-wide"><h2>Propósito</h2><p>El geoportal ayuda a identificar señales que justifican una revisión detallada, comparar períodos y documentar parámetros. No emite certificaciones ni sustituye una evaluación de campo.</p><h2>Dos interfaces, un motor</h2><p>Esta versión HTML convive con la aplicación Streamlit. Ambas reutilizan los motores Python de cobertura, fragmentación, conectividad y ERI; ninguna reemplaza sus fórmulas por cálculos del navegador.</p></div></section></main>{% endblock %}
+

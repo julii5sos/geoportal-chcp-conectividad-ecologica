@@ -27,6 +27,21 @@ La aplicación produce una **preevaluación indicativa**: ayuda a justificar por
 hallazgos en campo, no es una certificación, no determina cumplimiento EUDR y no
 demuestra por sí sola conectividad funcional para una especie.
 
+## Versión web HTML y API Python
+
+La rama de desarrollo `feature/web-html-api-chcp` incorpora una segunda interfaz
+independiente en `webapp/`, construida con HTML, CSS, JavaScript y Flask. Conserva
+`app.py` y la aplicación Streamlit como respaldo, y llama directamente a los motores
+Python existentes en vez de reescribir fórmulas en el navegador.
+
+```powershell
+$env:GEE_PROJECT_ID = "geoportal-513817"
+python -m flask --app webapp.main run --host 127.0.0.1 --port 8080
+```
+
+Consulte [la arquitectura web](docs/ARQUITECTURA_WEB_HTML.md) y
+[la comparación visual](docs/COMPARACION_VISUAL_WEB_HTML.md).
+
 ## Módulos científicos y funcionales
 
 - Navegación V2 entre **Inicio**, **Explorar**, **Comparar**, **Analizar**, **ERI**,

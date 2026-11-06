@@ -10,3 +10,4 @@ uploads/
 *.log
 output/
 tmp/
+.reference_html_original/

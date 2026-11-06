@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hero %}
+{% block title %}Geoportal CHCP 2.0 · Conectividad ecológica{% endblock %}
+{% block body %}
+<main>
+  {% call hero('Conectividad ecológica de la Cuenca del Canal de Panamá', 'Explore evidencia forestal, compare dos años y calcule fragmentación y conectividad estructural con fuentes verificables de Google Earth Engine.') %}
+    <a class="btn btn-w" href="{{ url_for('platform') }}">Abrir la plataforma</a>
+    <a class="btn btn-o" href="{{ url_for('methodology') }}">Conocer el método</a>
+  {% endcall %}
+  <section class="sec home-summary">
+    <div class="wrap home-grid">
+      <div class="home-copy">
+        <span class="eyebrow">Panel territorial</span>
+        <h2>Cuenca Hidrográfica del Canal de Panamá</h2>
+        <p>Seleccione un polígono, una de las {{ subbasin_count }} subcuencas disponibles o toda la CHCP. El motor compara períodos equivalentes sin convertir una selección visual en un resultado científico ficticio.</p>
+        <div class="meta home-meta">
+          <div><span>Fuentes temporales</span><b>JRC · ESRI</b></div>
+          <div><span>Proyecto GEE</span><b>{{ project_id }}</b></div>
+          <div><span>Resultado</span><b>Indicativo</b></div>
+        </div>
+        <a class="btn btn-p" href="{{ url_for('platform') }}">Explorar la CHCP</a>
+      </div>
+      <div id="home-map" class="home-map" aria-label="Mapa de la Cuenca Hidrográfica del Canal de Panamá"></div>
+    </div>
+  </section>
+  <section class="sec gris"><div class="wrap"><div class="sec-c"><h2>Un flujo único, cuatro lecturas</h2><p>El mapa permanece como centro de atención; los resultados aparecen únicamente después de ejecutar.</p></div><div class="cards module-cards">
+    <article class="card"><span class="date">01</span><h3>Cobertura</h3><p>Bosque, no bosque y transiciones sobre la máscara válida común.</p></article>
+    <article class="card"><span class="date">02</span><h3>Fragmentación</h3><p>Número de parches, tamaño medio, densidad y borde.</p></article>
+    <article class="card"><span class="date">03</span><h3>Conectividad</h3><p>Componentes, aislamiento y relaciones estructurales bajo un umbral común.</p></article>
+    <article class="card"><span class="date">Complementario</span><h3>ERI</h3><p>Lectura independiente con los pesos originales; no altera las métricas temporales.</p></article>
+  </div></div></section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}
+
