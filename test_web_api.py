@@ -1,10 +1,12 @@
 import io
 import os
 import unittest
+import zipfile
 from unittest.mock import patch
 
 from webapp.cache import ResultCache
 from webapp.main import create_app
+from webapp import service
 
 
 class WebApiTests(unittest.TestCase):
@@ -172,6 +174,60 @@ class WebApiTests(unittest.TestCase):
         self.assertTrue(second_hit)
         self.assertEqual(first.identifier, second.identifier)
         self.assertEqual(len(calls), 1)
+
+    def test_cache_indexes_latest_result_by_territory(self):
+        cache = ResultCache(max_entries=2, ttl_seconds=60)
+        item, _ = cache.run_once({"source": "jrc"}, lambda: {"value": 1}, territory_key="subcuenca:test")
+        self.assertEqual(cache.latest("subcuenca:test").identifier, item.identifier)
+
+    def test_cache_releases_signature_lock_after_failed_operation(self):
+        cache = ResultCache(max_entries=2, ttl_seconds=60)
+
+        with self.assertRaises(RuntimeError):
+            cache.run_once({"source": "jrc"}, lambda: (_ for _ in ()).throw(RuntimeError("falló")))
+
+        self.assertEqual(cache._locks, {})
+        item, hit = cache.run_once({"source": "jrc"}, lambda: {"value": 2})
+        self.assertFalse(hit)
+        self.assertEqual(item.value["value"], 2)
+
+    @patch("webapp.main.public_cached_result")
+    def test_cached_result_endpoint_returns_exact_result(self, public_cached_result):
+        public_cached_result.return_value = {"result_id": "e" * 32, "kind": "temporal_analysis"}
+        response = self.client.get(f"/api/v1/results/{'e' * 32}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result_id"], "e" * 32)
+
+    @patch("webapp.main.latest_result")
+    def test_latest_territory_result_has_explicit_empty_state(self, latest_result):
+        latest_result.return_value = None
+        response = self.client.get("/api/v1/territories/subcuenca:test/results/latest")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"result": None, "status": "not_calculated"})
+
+    @patch("webapp.main.run_evidence")
+    def test_complementary_evidence_endpoint_uses_real_contract(self, run_evidence):
+        run_evidence.return_value = {"result_id": "d" * 32, "kind": "complementary_evidence"}
+        response = self.client.post("/api/v1/evidence", json={"source":"hansen_gfc","area":{"mode":"basin"},"initial_year":2020,"final_year":2025})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["kind"], "complementary_evidence")
+
+    def test_complementary_download_identifies_its_own_methodology(self):
+        item, _ = service._CACHE.run_once(
+            {"test": "evidence-download"},
+            lambda: {
+                "kind": "complementary_evidence",
+                "source_key": "hansen_gfc",
+                "area": {"geometry": {"type": "Polygon", "coordinates": []}},
+                "result": {"source": "Hansen Global Forest Change v1.13", "asset": "UMD/hansen/test"},
+            },
+        )
+        content = service.build_download(item.identifier)
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            methodology = archive.read("METODOLOGIA.txt").decode("utf-8")
+        self.assertIn("evidencia complementaria", methodology)
+        self.assertIn("Hansen Global Forest Change", methodology)
+        self.assertNotIn("reutilizan analisis_temporal.py", methodology)
 
 
 if __name__ == "__main__":

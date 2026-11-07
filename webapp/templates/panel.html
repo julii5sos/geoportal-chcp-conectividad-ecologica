@@ -9,6 +9,10 @@
         <div><h1 id="panel-territory-name">Seleccione un territorio</h1><p id="panel-territory-group">Consulta inmediata sin recalcular Earth Engine.</p></div>
         <a class="btn btn-w" id="panel-analyze" href="{{ url_for('platform') }}">Ejecutar análisis</a>
       </div>
+      <div class="panel-mode-switch" role="group" aria-label="Modo de consulta">
+        <button type="button" data-panel-mode="latest" aria-pressed="true">Estado más reciente disponible</button>
+        <a href="{{ url_for('platform') }}" id="panel-custom-analysis">Análisis personalizado</a>
+      </div>
     </div>
   </section>
   <section class="territory-panel-work wrap">
@@ -21,8 +25,9 @@
     </aside>
     <div class="territory-panel-main">
       <div class="territory-kpis" id="territory-kpis"></div>
+      <div class="result-provenance" id="result-provenance" hidden></div>
       <div class="territory-tabs" role="tablist" aria-label="Resultados territoriales">
-        {% for key, label in [('summary','Resumen'),('coverage','Cobertura forestal'),('fragmentation','Fragmentación'),('connectivity','Conectividad'),('corridors','Corredores'),('eri','ERI'),('temporal','Comparación temporal'),('concordance','Concordancia JRC + ESRI')] %}
+        {% for key, label in [('summary','Resumen'),('coverage','Cobertura forestal'),('evidence','Vegetación y estructura'),('fragmentation','Fragmentación'),('connectivity','Conectividad'),('corridors','Corredores'),('eri','ERI'),('temporal','Comparación temporal'),('concordance','Concordancia JRC + ESRI')] %}
         <button type="button" role="tab" data-territory-tab="{{ key }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ label }}</button>
         {% endfor %}
       </div>

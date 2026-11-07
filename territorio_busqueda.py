@@ -11,7 +11,13 @@ from pyproj import Transformer
 from shapely.geometry import shape
 from shapely.ops import transform
 
-from corredores import cargar_corredores, cargar_puntos_criticos
+from corredores import (
+    FUENTE_CORTA,
+    analizar_interseccion_corredores,
+    cargar_catalogo,
+    cargar_corredores,
+    cargar_puntos_criticos,
+)
 from territorio_local import coleccion_subcuencas, geometria_cuenca
 
 
@@ -55,6 +61,24 @@ def catalogo_territorial() -> tuple[dict[str, Any], ...]:
                 "geometry": feature["geometry"],
             }
         )
+    for index, feature in enumerate(cargar_corredores().get("features", []), start=1):
+        props = feature.get("properties", {})
+        name = str(props.get("nombre") or f"Corredor {index}").strip()
+        identifier = f"corredor:{index:02d}-{_slug(name)}"
+        if identifier in seen:
+            raise ValueError("El catálogo contiene corredores duplicados.")
+        seen.add(identifier)
+        rows.append(
+            {
+                "id": identifier,
+                "tipo": "corredor",
+                "nombre": name,
+                "grupo": "Corredores publicados · Almanaque Azul",
+                "aliases": [str(props.get("categoria_etiqueta") or "")],
+                "geometry": feature["geometry"],
+                "properties": props,
+            }
+        )
     return tuple(rows)
 
 
@@ -92,12 +116,8 @@ def _area_ha(geometry: dict[str, Any]) -> float:
 def resumen_territorial(identifier: str) -> dict[str, Any]:
     row = obtener_territorio(identifier)
     geometry = shape(row["geometry"])
-    corridors = []
-    for feature in cargar_corredores().get("features", []):
-        candidate = shape(feature["geometry"])
-        if candidate.intersects(geometry):
-            props = feature.get("properties", {})
-            corridors.append(props.get("nombre") or props.get("categoria") or "Corredor publicado")
+    corridor_analysis = analizar_interseccion_corredores(row["geometry"])
+    corridors = [item["nombre"] for item in corridor_analysis["corredores"]]
     critical = 0
     for feature in cargar_puntos_criticos().get("features", []):
         if geometry.covers(shape(feature["geometry"])):
@@ -109,6 +129,7 @@ def resumen_territorial(identifier: str) -> dict[str, Any]:
         "area_ha": round(area_ha, 4),
         "area_km2": round(area_ha / 100, 4),
         "corridors": {"count": len(corridors), "names": sorted(set(str(item) for item in corridors))},
+        "corridor_analysis": corridor_analysis,
         "critical_points": critical,
         "scientific_indicators": {
             "status": "not_calculated",
@@ -118,6 +139,8 @@ def resumen_territorial(identifier: str) -> dict[str, Any]:
             "source": "GeoJSON local del Geoportal CHCP",
             "crs": "EPSG:4326",
             "area_crs": "EPSG:8857",
+            "corridor_source": FUENTE_CORTA,
+            "corridor_catalog": cargar_catalogo(),
         },
     }
 

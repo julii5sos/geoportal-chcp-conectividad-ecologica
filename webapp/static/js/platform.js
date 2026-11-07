@@ -17,6 +17,8 @@
     drawingPoints: [],
     drawingMarkers: [],
     drawingLine: null,
+    territoryId: null,
+    requestSequence: 0,
     wizardStep: 0,
     wizard: {
       analyses: ['coverage', 'fragmentation', 'connectivity'],
@@ -177,12 +179,36 @@
   let subbasinLayer;
   let corridorLayer;
   let criticalPointLayer;
+  async function prepareCorridorFromMap(feature, layer) {
+    const name = feature.properties?.nombre || 'Corredor publicado';
+    try {
+      const response = await api(`/api/v1/territories/search?q=${encodeURIComponent(name)}`);
+      const item = (response.results || []).find((candidate) => candidate.tipo === 'corredor' && candidate.nombre === name);
+      if (!item) throw new Error('El corredor no tiene un identificador territorial disponible.');
+      state.territoryId = item.id;
+      state.wizard.areaMode = 'draw';
+      state.wizard.subbasin = '';
+      state.drawnGeometry = feature.geometry;
+      if (state.areaLayer) map.removeLayer(state.areaLayer);
+      state.areaLayer = L.geoJSON(feature.geometry, {style: layerStyle('area')}).addTo(map);
+      map.fitBounds(layer.getBounds(), {padding:[35,35],maxZoom:13});
+      $('#selected-territory-id').textContent = `Territorio preparado: ${name}`;
+      writePortalState({territoryId:item.id,territoryName:name,territoryType:'corredor'});
+      updateAreaLabel();
+      toast(`${name} quedó preparado para el análisis.`, 'success');
+    } catch (error) {
+      toast(`No se pudo preparar el corredor: ${error.message}`, 'error');
+    }
+  }
   function renderTerritory() {
     basinLayer = L.geoJSON(state.territory.basin, { style: layerStyle('basin') }).addTo(map);
     subbasinLayer = L.geoJSON(state.territory.subbasins, { style: layerStyle('subbasins'), onEachFeature: (feature, layer) => layer.bindTooltip(feature.properties?.nombre || 'Subcuenca') });
     corridorLayer = L.geoJSON(state.territory.corridors, {
       style: layerStyle('corridors'),
-      onEachFeature: (feature, layer) => layer.bindTooltip(feature.properties?.nombre || 'Corredor publicado'),
+      onEachFeature: (feature, layer) => {
+        layer.bindTooltip(`${feature.properties?.nombre || 'Corredor publicado'} · clic para analizar`);
+        layer.on('click', () => prepareCorridorFromMap(feature, layer));
+      },
     });
     criticalPointLayer = L.geoJSON(state.territory.critical_points, {
       pointToLayer: (feature, latlng) => L.circleMarker(latlng, layerStyle('criticalPoints')),
@@ -238,6 +264,64 @@
       });
       writePortalState({resultOpacity:state.resultOpacity});
     };
+    const evidenceSource = $('#evidence-source');
+    const refreshEvidence = () => {
+      const fixed = ['gedi','worldcover'].includes(evidenceSource.value);
+      $('#evidence-years').hidden = fixed;
+      $('#evidence-note').textContent = fixed ? 'Producto de referencia fija; no se fabrica una serie anual.' : evidenceSource.value === 'hansen_gfc' ? 'Pérdida anual 2001–2025; no equivale automáticamente a deforestación.' : 'Mediana anual con máscara SCL y respaldo del año anterior donde falten observaciones.';
+      if (evidenceSource.value === 'sentinel_ndvi') { $('#evidence-initial').min='2017'; $('#evidence-final').max='2026'; }
+      else { $('#evidence-initial').min='2001'; $('#evidence-final').max='2025'; }
+    };
+    evidenceSource.onchange = refreshEvidence;
+    refreshEvidence();
+    $('#run-evidence').onclick = runEvidence;
+  }
+
+  async function runEvidence() {
+    if (state.wizard.areaMode === 'draw' && !state.drawnGeometry) { toast('Dibuje un polígono o seleccione un territorio antes de calcular.', 'error'); return; }
+    const source = $('#evidence-source').value;
+    const payload = {source, area:currentAreaRequest(), initial_year:Number($('#evidence-initial').value), final_year:Number($('#evidence-final').value), parameters:{tree_cover_threshold:30}, territory_id:state.territoryId};
+    if (['gedi','worldcover'].includes(source)) { payload.initial_year = null; payload.final_year = null; }
+    const sequence = ++state.requestSequence;
+    writePortalState({analysisStatus:'processing',analysisTerritoryId:state.territoryId,analysisLabel:`${source} · evidencia complementaria`,analysisError:null});
+    setBusy(true, 'Calculando evidencia complementaria');
+    $('#run-evidence').disabled = true;
+    try {
+      const response = await api('/api/v1/evidence', {method:'POST', body:JSON.stringify(payload)});
+      if (sequence !== state.requestSequence) {
+        writePortalState({resultId:response.result_id,resultTerritoryId:payload.territory_id,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:payload.territory_id,analysisError:null});
+        return;
+      }
+      state.result = response;
+      renderEvidenceResult(response);
+      $('#download-result').disabled = false;
+      writePortalState({resultId:response.result_id,resultTerritoryId:state.territoryId,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:state.territoryId,analysisError:null});
+      toast(response.cache_hit ? 'Se reutilizó la misma evidencia en caché.' : 'Evidencia calculada.');
+    } catch (error) {
+      writePortalState({analysisStatus:'error',analysisTerritoryId:payload.territory_id,analysisError:error.message});
+      toast(error.message, 'error');
+    }
+    finally { stopBusy(); $('#run-evidence').disabled = false; }
+  }
+
+  function renderEvidenceResult(response) {
+    clearResultLayers();
+    const result = response.result;
+    Object.entries(result.maps || {}).forEach(([key, descriptor], index) => addTileResultLayer(`evidence-${key}`, descriptor.legend || key, descriptor, index === 0));
+    if (state.areaLayer) map.removeLayer(state.areaLayer);
+    state.areaLayer = L.geoJSON(response.area.geometry, {style:layerStyle('area')}).addTo(map);
+    map.fitBounds(state.areaLayer.getBounds(), {padding:[35,35],maxZoom:14});
+    const statistics = Object.entries(result.statistics || {}).filter(([,value]) => !Array.isArray(value) && typeof value !== 'object');
+    const annual = result.statistics?.annual_loss_ha;
+    const cards = statistics.map(([key,value]) => metric(key.replaceAll('_',' '), typeof value === 'number' ? number(value,3) : value ?? 'Sin datos', result.source)).join('');
+    const chart = annual?.length ? `<div class="chart-card"><h3>Pérdida anual (ha)</h3>${barChart(annual.map(item => ({label:item.year,value:item.value,formatted:hectares(item.value),color:'#e76f51'})))}</div>` : '';
+    $('#results-title').textContent = result.source;
+    $('#results-subtitle').textContent = `${response.area.label} · evidencia independiente`;
+    $('#results-body').innerHTML = `<div class="metric-grid">${cards || metric('Estado','Sin observaciones válidas',result.source)}</div>${chart}<div class="res-sec"><h3>Metodología y límites</h3>${result.method ? `<p>${esc(result.method)}</p>` : ''}<ul class="warning-list">${(result.limitations || []).map(item => `<li>${esc(item)}</li>`).join('')}</ul></div><a class="btn btn-s download-link" href="/api/v1/results/${response.result_id}/download.zip">Descargar resultado y metadatos</a>`;
+    $('#results-panel').classList.remove('closed');
+    $('#results-reopen').hidden = true;
+    renderLayers(); renderLegend();
+    setTimeout(() => map.invalidateSize(),220);
   }
 
   function currentAreaRequest() {
@@ -317,6 +401,7 @@
     state.areaLayer = L.geoJSON(state.drawnGeometry, {style: layerStyle('area')}).addTo(map);
     map.fitBounds(state.areaLayer.getBounds(), {padding: [40, 40], maxZoom: 15});
     state.wizard.areaMode = 'draw';
+    state.territoryId = null;
     updateAreaLabel();
     stopDrawing(true);
   });
@@ -415,25 +500,51 @@
       final_year: state.wizard.finalYear,
       maximum_distance_m: state.wizard.maximumDistance,
       minimum_patch_area_ha: state.wizard.minimumPatchArea,
+      territory_id: state.territoryId,
     };
+  }
+
+  function selectionFingerprint() {
+    return JSON.stringify(analysisPayload());
   }
 
   async function runAnalysis() {
     persistWizard();
+    const requestSequence = ++state.requestSequence;
+    const payload = analysisPayload();
+    const fingerprint = JSON.stringify(payload);
+    writePortalState({analysisStatus:'processing',analysisTerritoryId:payload.territory_id,analysisLabel:`${payload.source} · ${payload.initial_year}–${payload.final_year}`,analysisError:null});
     setBusy(true, 'Calculando análisis científico');
     $('#open-analysis').disabled = true;
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 420000);
-      const response = await api('/api/v1/analyses', {method: 'POST', body: JSON.stringify(analysisPayload()), signal: controller.signal});
+      const response = await api('/api/v1/analyses', {method: 'POST', body: JSON.stringify(payload), signal: controller.signal});
       clearTimeout(timer);
+      if (requestSequence !== state.requestSequence || fingerprint !== selectionFingerprint()) {
+        writePortalState({resultId:response.result_id,resultTerritoryId:payload.territory_id,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:payload.territory_id,analysisError:null});
+        toast('El análisis terminó, pero la selección cambió. El resultado se guardó sin reemplazar la vista activa.');
+        return;
+      }
       state.result = response;
       state.eri = null;
       renderAnalysisResult(response);
       $('#download-result').disabled = false;
+      writePortalState({
+        resultId: response.result_id,
+        resultTerritoryId: state.territoryId,
+        resultCreatedUtc: response.created_utc,
+        resultSource: state.wizard.source,
+        resultInitialYear: state.wizard.initialYear,
+        resultFinalYear: state.wizard.finalYear,
+        analysisStatus: 'available',
+        analysisTerritoryId: payload.territory_id,
+        analysisError: null,
+      });
       toast(response.cache_hit ? 'Se reutilizó un resultado idéntico en caché.' : 'Análisis completado.');
     } catch (error) {
       const suffix = error.supportId ? ` Código de soporte: ${error.supportId}.` : '';
+      writePortalState({analysisStatus:'error',analysisTerritoryId:payload.territory_id,analysisError:`${error.message}${suffix}`});
       toast(`${error.name === 'AbortError' ? 'El análisis superó el tiempo de espera.' : error.message}${suffix}`, 'error');
     } finally {
       stopBusy();
@@ -523,6 +634,7 @@
   }
 
   function renderAnalysisResult(response) {
+    if (response.kind === 'complementary_evidence') { renderEvidenceResult(response); return; }
     renderAnalysisMap(response);
     const views = resultViews(response);
     $('#results-title').textContent = 'Resultado del análisis';
@@ -585,10 +697,15 @@
     if (requested) {
       try {
         const summary = await api(`/api/v1/territories/${encodeURIComponent(requested)}/summary`);
+        state.territoryId = requested;
         $('#selected-territory-id').textContent = `Territorio preparado: ${summary.territory.nombre}`;
         if (summary.territory.tipo === 'subcuenca') {
           state.wizard.areaMode = 'subbasin';
           state.wizard.subbasin = summary.territory.nombre;
+        } else if (summary.territory.tipo === 'corredor') {
+          state.wizard.areaMode = 'draw';
+          state.wizard.subbasin = '';
+          state.drawnGeometry = summary.geometry;
         } else {
           state.wizard.areaMode = 'basin';
           state.wizard.subbasin = '';
@@ -602,6 +719,21 @@
       }
     }
     if (params.get('draw') === '1') startDrawing();
+  }
+
+  async function restoreResult() {
+    const params = new URLSearchParams(window.location.search);
+    const stored = readPortalState();
+    const identifier = params.get('result') || stored.resultId;
+    if (!identifier) return;
+    try {
+      const response = await api(`/api/v1/results/${encodeURIComponent(identifier)}`);
+      state.result = response;
+      renderAnalysisResult(response);
+      $('#download-result').disabled = false;
+    } catch (error) {
+      if (error.status !== 404) toast(`No se pudo recuperar el resultado: ${error.message}`, 'error');
+    }
   }
 
   try {
@@ -620,6 +752,7 @@
     renderLayers();
     updateAreaLabel();
     await applyPreparedTerritory();
+    await restoreResult();
   } catch (error) {
     toast(`No se pudo iniciar el geoportal: ${error.message}`, 'error');
     $('#open-analysis').disabled = true;

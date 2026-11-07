@@ -11,9 +11,15 @@ from territorio_busqueda import (
 class TerritorySearchTests(unittest.TestCase):
     def test_catalog_has_basin_and_53_unique_subbasins(self):
         catalog = catalogo_territorial()
-        self.assertEqual(len(catalog), 54)
-        self.assertEqual(len({item["id"] for item in catalog}), 54)
+        self.assertEqual(len({item["id"] for item in catalog}), len(catalog))
         self.assertEqual(sum(item["tipo"] == "subcuenca" for item in catalog), 53)
+        self.assertEqual(sum(item["tipo"] == "corredor" for item in catalog), 22)
+
+    def test_corridors_are_searchable_and_have_real_geometry(self):
+        result = buscar_territorios("corredor biologico mesoamericano")
+        self.assertTrue(any(item["tipo"] == "corredor" for item in result))
+        corridor = obtener_territorio(next(item["id"] for item in result if item["tipo"] == "corredor"))
+        self.assertIn(corridor["geometry"]["type"], {"Polygon", "MultiPolygon"})
 
     def test_search_ignores_accents_case_and_accepts_partial_terms(self):
         by_case = buscar_territorios("MIRAFLORES")

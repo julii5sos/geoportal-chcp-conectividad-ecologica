@@ -44,6 +44,9 @@ class WebFrontendTests(unittest.TestCase):
         self.assertIn("Filtros", html)
         self.assertIn("Mapa base", html)
         self.assertIn("Corredores publicados", (ROOT / "webapp" / "static" / "js" / "platform.js").read_text(encoding="utf-8"))
+        self.assertIn("prepareCorridorFromMap", (ROOT / "webapp" / "static" / "js" / "platform.js").read_text(encoding="utf-8"))
+        self.assertIn('id="evidence-source"', html)
+        self.assertIn('id="run-evidence"', html)
 
     def test_javascript_connects_controls_to_real_api(self):
         javascript = (ROOT / "webapp" / "static" / "js" / "platform.js").read_text(encoding="utf-8")
@@ -53,6 +56,12 @@ class WebFrontendTests(unittest.TestCase):
         self.assertIn("integratedResultViews", javascript)
         self.assertIn("concordanceState", javascript)
         self.assertIn("/api/v1/catalog/sources", javascript)
+        self.assertIn("/api/v1/evidence", javascript)
+        panel_javascript = (ROOT / "webapp" / "static" / "js" / "panel.js").read_text(encoding="utf-8")
+        self.assertIn("/results/latest", panel_javascript)
+        self.assertIn("result-provenance", panel_javascript)
+        self.assertIn("analysisStatus:'processing'", javascript)
+        self.assertIn("Error de procesamiento", panel_javascript)
         self.assertNotIn("Math.random", javascript)
 
     def test_original_css_is_preserved_and_extended(self):

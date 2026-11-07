@@ -27,6 +27,7 @@ class ResultCache:
         self._by_id: OrderedDict[str, CachedResult] = OrderedDict()
         self._by_signature: dict[str, str] = {}
         self._locks: dict[str, threading.Lock] = {}
+        self._latest_by_territory: dict[str, str] = {}
         self._guard = threading.RLock()
 
     @staticmethod
@@ -44,9 +45,17 @@ class ResultCache:
         for identifier in expired:
             item = self._by_id.pop(identifier)
             self._by_signature.pop(item.signature, None)
+            self._latest_by_territory = {
+                key: value for key, value in self._latest_by_territory.items()
+                if value != identifier
+            }
         while len(self._by_id) > self.max_entries:
-            _, item = self._by_id.popitem(last=False)
+            identifier, item = self._by_id.popitem(last=False)
             self._by_signature.pop(item.signature, None)
+            self._latest_by_territory = {
+                key: value for key, value in self._latest_by_territory.items()
+                if value != identifier
+            }
 
     def get(self, identifier: str) -> CachedResult | None:
         with self._guard:
@@ -56,10 +65,18 @@ class ResultCache:
                 self._by_id.move_to_end(identifier)
             return item
 
+    def latest(self, territory_key: str) -> CachedResult | None:
+        with self._guard:
+            self._purge()
+            identifier = self._latest_by_territory.get(territory_key)
+            return self.get(identifier) if identifier else None
+
     def run_once(
         self,
         payload: dict[str, Any],
         operation: Callable[[], dict[str, Any]],
+        *,
+        territory_key: str | None = None,
     ) -> tuple[CachedResult, bool]:
         signature = self.signature(payload)
         with self._guard:
@@ -68,28 +85,38 @@ class ResultCache:
             if existing_id and existing_id in self._by_id:
                 item = self._by_id[existing_id]
                 self._by_id.move_to_end(existing_id)
+                if territory_key:
+                    self._latest_by_territory[territory_key] = item.identifier
                 return item, True
             lock = self._locks.setdefault(signature, threading.Lock())
 
-        with lock:
+        try:
+            with lock:
+                with self._guard:
+                    self._purge()
+                    existing_id = self._by_signature.get(signature)
+                    if existing_id and existing_id in self._by_id:
+                        item = self._by_id[existing_id]
+                        self._by_id.move_to_end(existing_id)
+                        if territory_key:
+                            self._latest_by_territory[territory_key] = item.identifier
+                        return item, True
+                value = operation()
+                item = CachedResult(
+                    identifier=uuid.uuid4().hex,
+                    signature=signature,
+                    created_at=time.time(),
+                    value=value,
+                )
+                with self._guard:
+                    self._by_id[item.identifier] = item
+                    self._by_signature[signature] = item.identifier
+                    if territory_key:
+                        self._latest_by_territory[territory_key] = item.identifier
+                    self._purge()
+                return item, False
+        finally:
             with self._guard:
-                self._purge()
-                existing_id = self._by_signature.get(signature)
-                if existing_id and existing_id in self._by_id:
-                    item = self._by_id[existing_id]
-                    self._by_id.move_to_end(existing_id)
-                    return item, True
-            value = operation()
-            item = CachedResult(
-                identifier=uuid.uuid4().hex,
-                signature=signature,
-                created_at=time.time(),
-                value=value,
-            )
-            with self._guard:
-                self._by_id[item.identifier] = item
-                self._by_signature[signature] = item.identifier
-                self._locks.pop(signature, None)
-                self._purge()
-            return item, False
+                if self._locks.get(signature) is lock:
+                    self._locks.pop(signature, None)
 

@@ -28,8 +28,9 @@ from analisis_integrado import (
     ANIO_INICIAL_COMUN,
     ejecutar_analisis_integrado_ee,
 )
+from analisis_complementario import ejecutar_evidencia
 from catalogo_multifuente import catalogo_por_categoria, matriz_trazabilidad
-from corredores import cargar_corredores, cargar_puntos_criticos
+from corredores import analizar_interseccion_corredores, cargar_corredores, cargar_puntos_criticos
 from eri_gee import calcular_eri_geojson
 from gee_config import inicializar_earth_engine, resolver_proyecto_gee
 from simbologia_geoportal import catalogo_simbologia
@@ -40,7 +41,7 @@ from territorio_local import (
     nombres_subcuencas,
 )
 from webapp.cache import CachedResult, ResultCache
-from webapp.models import AnalysisRequest, AreaSelection, EriRequest
+from webapp.models import AnalysisRequest, AreaSelection, EriRequest, EvidenceRequest
 
 
 MAX_COORDINATES = int(os.getenv("WEB_MAX_COORDINATES", "5000"))
@@ -260,6 +261,7 @@ def run_analysis(request: AnalysisRequest) -> dict[str, Any]:
             "selected_analyses": request.analyses,
             "area": {**area, "geometry": geometry},
             "result": result,
+            "corridor_context": analizar_interseccion_corredores(geometry),
             "warnings": [
                 "Resultado indicativo: requiere interpretación y verificación de campo.",
                 "La conectividad calculada es estructural y no demuestra movimiento de fauna.",
@@ -267,7 +269,38 @@ def run_analysis(request: AnalysisRequest) -> dict[str, Any]:
             ] + (result.get("warnings", []) if request.source == "integrated" else []),
         }
 
-    item, cache_hit = _CACHE.run_once(payload, operation)
+    territory_key = request.territory_id or ResultCache.signature({"geometry": geometry})
+    item, cache_hit = _CACHE.run_once(payload, operation, territory_key=territory_key)
+    return _public_record(item, cache_hit=cache_hit)
+
+
+def run_evidence(request: EvidenceRequest) -> dict[str, Any]:
+    geometry, area = resolve_area(request.area)
+    payload = {
+        "kind": "complementary_evidence",
+        "request": request.model_dump(mode="json"),
+        "resolved_geometry": geometry,
+        "algorithm_version": "complementary-evidence-2026.1",
+    }
+
+    def operation() -> dict[str, Any]:
+        project = _initialize_ee()
+        result = ejecutar_evidencia(
+            request.source, geometry, request.initial_year, request.final_year,
+            request.parameters, ee_module=ee,
+        )
+        return {
+            "kind": "complementary_evidence",
+            "project_id": project,
+            "source_key": request.source,
+            "area": {**area, "geometry": geometry},
+            "result": result,
+            "corridor_context": analizar_interseccion_corredores(geometry),
+            "warnings": result.get("limitations", []),
+        }
+
+    territory_key = request.territory_id or ResultCache.signature({"geometry": geometry})
+    item, cache_hit = _CACHE.run_once(payload, operation, territory_key=territory_key)
     return _public_record(item, cache_hit=cache_hit)
 
 
@@ -300,6 +333,18 @@ def cached_result(identifier: str) -> CachedResult | None:
     if len(identifier) != 32 or any(char not in "0123456789abcdef" for char in identifier):
         return None
     return _CACHE.get(identifier)
+
+
+def public_cached_result(identifier: str) -> dict[str, Any] | None:
+    item = cached_result(identifier)
+    return _public_record(item, cache_hit=True) if item else None
+
+
+def latest_result(territory_key: str) -> dict[str, Any] | None:
+    if not territory_key or len(territory_key) > 180:
+        return None
+    item = _CACHE.latest(territory_key)
+    return _public_record(item, cache_hit=True) if item else None
 
 
 def build_download(identifier: str) -> bytes | None:
@@ -349,16 +394,30 @@ def build_download(identifier: str) -> bytes | None:
                     f"fuente_{source_key}_resultado.json",
                     json.dumps(source_result, ensure_ascii=False, indent=2),
                 )
-        archive.writestr(
-            "METODOLOGIA.txt",
-            (
-                "Geoportal CHCP 2.0\n"
+        kind = value.get("kind")
+        if kind == "complementary_evidence":
+            methodology = (
+                "Geoportal CHCP 2.0 — evidencia complementaria\n"
+                f"Fuente: {result.get('source', value.get('source_key', 'no indicada'))}\n"
+                f"Asset: {result.get('asset', 'no indicado')}\n"
+                "Este producto conserva su metodología y no se fusiona automáticamente con JRC, ESRI, ERI ni corredores.\n"
+                "Revise resultado_completo.json para parámetros, período y limitaciones.\n"
+            )
+        elif kind == "eri":
+            methodology = (
+                "Geoportal CHCP 2.0 — ERI complementario\n"
+                "El ERI permanece separado de cobertura, fragmentación y conectividad temporal.\n"
+                "Sus pesos originales no fueron modificados.\n"
+            )
+        else:
+            methodology = (
+                "Geoportal CHCP 2.0 — análisis temporal\n"
                 "Los cálculos reutilizan analisis_temporal.py y bosque_conectividad.py.\n"
                 "El ERI permanece separado de las métricas temporales.\n"
                 "La modalidad integrada calcula JRC y ESRI por separado y compara su concordancia; no fusiona productos.\n"
                 "Consulte docs/METODOLOGIA_ANALISIS_TEMPORAL.md para las limitaciones.\n"
-            ),
-        )
+            )
+        archive.writestr("METODOLOGIA.txt", methodology)
     return output.getvalue()
 
 
@@ -373,4 +432,8 @@ def territory_payload() -> dict[str, Any]:
         "corridors": cargar_corredores(),
         "critical_points": cargar_puntos_criticos(),
     }
+
+
+def corridor_context(geometry: dict[str, Any]) -> dict[str, Any]:
+    return analizar_interseccion_corredores(geometry)
 

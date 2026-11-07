@@ -33,6 +33,7 @@ class AnalysisRequest(BaseModel):
     final_year: int
     maximum_distance_m: float = Field(default=500, ge=50, le=5000)
     minimum_patch_area_ha: float = Field(default=0, ge=0, le=500)
+    territory_id: str | None = Field(default=None, max_length=180)
 
     @model_validator(mode="after")
     def normalize_analyses(self):
@@ -44,4 +45,19 @@ class AnalysisRequest(BaseModel):
 
 class EriRequest(BaseModel):
     area: AreaSelection
+
+
+class EvidenceRequest(BaseModel):
+    source: Literal["hansen_gfc", "sentinel_ndvi", "gedi", "worldcover", "sinia_2021", "firms"]
+    area: AreaSelection
+    initial_year: int | None = Field(default=None, ge=2000, le=2026)
+    final_year: int | None = Field(default=None, ge=2000, le=2026)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    territory_id: str | None = Field(default=None, max_length=180)
+
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.initial_year is not None and self.final_year is not None and self.initial_year > self.final_year:
+            raise ValueError("El año inicial no puede ser posterior al final.")
+        return self
 
