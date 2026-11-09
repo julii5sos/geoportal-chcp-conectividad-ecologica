@@ -1,0 +1,12 @@
+# Dependencias de la aplicación Flask/API desplegable.
+# La interfaz Streamlit histórica conserva sus dependencias en requirements.txt.
+reportlab>=4.2,<5
+earthengine-api>=1.5,<2
+requests>=2.32,<3
+networkx>=3.2,<4
+pyproj>=3.6,<4
+pyshp>=2.3,<4
+shapely>=2.0,<3
+flask>=3.1,<4
+pydantic>=2.7,<3
+gunicorn>=23,<24; platform_system != "Windows"

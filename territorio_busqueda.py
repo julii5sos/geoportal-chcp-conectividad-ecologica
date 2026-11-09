@@ -138,6 +138,7 @@ def resumen_territorial(identifier: str) -> dict[str, Any]:
         "metadata": {
             "source": "GeoJSON local del Geoportal CHCP",
             "crs": "EPSG:4326",
+            "area_method": "Proyección equivalente para calcular superficies sin usar grados",
             "area_crs": "EPSG:8857",
             "corridor_source": FUENTE_CORTA,
             "corridor_catalog": cargar_catalogo(),

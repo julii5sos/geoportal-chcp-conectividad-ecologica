@@ -37,7 +37,7 @@ La matriz ejecutable vive en `catalogo_multifuente.py`. El endpoint `GET /api/v1
 | FIRMS | `FIRMS` | 2000–actualidad; diario; 1 km | Catálogo complementario | Disponible pero no conectada | Producto NRT, no atribuir causalidad ni calidad científica final |
 | GLAD/RADD | Sin ruta verificada | según proveedor | Alertas potenciales | No disponible | Definir proveedor, licencia, API y validación |
 | MERIT Hydro | `MERIT/Hydro/v1_0_1` | referencia; ~90 m | Proximidad riparia del ERI | Integrada y operativa | No sustituye hidrografía local detallada |
-| SINIA/MiAMBIENTE 2021 | `EE_ASSET_BOSQUE_2021` | 2021; vector privado | Cobertura institucional en Streamlit | Pendiente de permisos o migración | Compartir/migrar asset a identidad final |
+| SINIA/MiAMBIENTE 2021 | `SINIA_2021_COBERTURA_GENERAL_VECTOR` | 2021; vector oficial | Cobertura, fragmentación y conectividad estructural | Verificado localmente en `geoportal-513817` | Otorgar lectura a la cuenta de servicio antes de desplegar |
 | SINIA 1992/2000 | No se halló archivo geoespacial validable | 1992 y 2000 | Ninguna | No disponible | Solicitar datos, leyendas, CRS y metadatos; no usar PNG demostrativos |
 | Corredores Almanaque Azul | `data/corredores_almanaque_azul.geojson` | referencia vectorial | Consulta territorial y mapa | Integrada y operativa | Intersección no prueba conectividad funcional |
 | CHCP y 53 subcuencas | `data/territorio/*.geojson` | referencia vectorial WGS 84 | Búsqueda, selección y recorte | Integrada y operativa | Conservar trazabilidad institucional |

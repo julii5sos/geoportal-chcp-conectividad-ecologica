@@ -10,7 +10,15 @@
     result: null,
     eri: null,
     resultLayers: new Map(),
-    activeLayers: new Set(['basin']),
+    activeLayers: new Set(['basin', 'corridors', 'criticalPoints']),
+    preview: {
+      ndviYear: 2025,
+      jrcYear: 2025,
+      hansenYear: 2025,
+      esriYear: 2025,
+      officialSource: '2023_general',
+      loading: new Set(),
+    },
     areaLayer: null,
     drawnGeometry: null,
     drawing: false,
@@ -19,9 +27,11 @@
     drawingLine: null,
     territoryId: null,
     requestSequence: 0,
+    lastAnalysisFingerprint: null,
     wizardStep: 0,
     wizard: {
-      analyses: ['coverage', 'fragmentation', 'connectivity'],
+      mode: 'custom',
+      selectedComponents: ['ecological'],
       areaMode: 'draw',
       subbasin: '',
       source: 'jrc_tmf',
@@ -29,6 +39,8 @@
       finalYear: 2025,
       maximumDistance: 500,
       minimumPatchArea: 0,
+      evidenceSource: 'hansen_gfc',
+      officialCoverageYear: 2021,
     },
   };
 
@@ -48,19 +60,21 @@
     return state.config?.symbology?.[group]?.[key]?.color || fallback;
   }
 
-  function setBusy(on, title = 'Procesando') {
+  function setBusy(on, title = 'Procesando', steps = null) {
     const busy = $('#busy');
     busy.hidden = !on;
     if (!on) return;
+    const activeSteps = steps || ['Validando el área', 'Consultando cobertura', 'Preparando parches', 'Construyendo red', 'Preparando resultados'];
+    setBusy._steps = activeSteps;
     $('#busy-title').textContent = title;
-    $('#busy-steps').innerHTML = ['Validando el área', 'Consultando Earth Engine', 'Calculando parches y red', 'Preparando resultados'].map((step, index) => `<li class="${index === 0 ? 'now' : ''}">${index === 0 ? '●' : '○'} ${step}</li>`).join('');
-    $('#busy-bar').style.width = '16%';
+    $('#busy-steps').innerHTML = activeSteps.map((step, index) => `<li class="${index === 0 ? 'now' : ''}">${index === 0 ? '●' : '○'} ${step}</li>`).join('');
+    $('#busy-bar').style.width = `${Math.round(100 / activeSteps.length)}%`;
     let index = 0;
     clearInterval(setBusy._timer);
     setBusy._timer = setInterval(() => {
-      index = Math.min(3, index + 1);
-      $('#busy-steps').innerHTML = ['Validando el área', 'Consultando Earth Engine', 'Calculando parches y red', 'Preparando resultados'].map((step, item) => `<li class="${item < index ? 'done' : item === index ? 'now' : ''}">${item < index ? '✓' : item === index ? '●' : '○'} ${step}</li>`).join('');
-      $('#busy-bar').style.width = `${20 + index * 23}%`;
+      index = Math.min(activeSteps.length - 1, index + 1);
+      $('#busy-steps').innerHTML = activeSteps.map((step, item) => `<li class="${item < index ? 'done' : item === index ? 'now' : ''}">${item < index ? '✓' : item === index ? '●' : '○'} ${step}</li>`).join('');
+      $('#busy-bar').style.width = `${Math.round((index + 1) / activeSteps.length * 100)}%`;
     }, 3500);
   }
   function stopBusy() { clearInterval(setBusy._timer); setBusy(false); }
@@ -78,6 +92,16 @@
       patchesFinal: { color: '#062a5e', weight: .7, fillColor: '#3a7ca5', fillOpacity: .42 },
       connectionsInitial: { color: '#fabc20', weight: 2, opacity: .8 },
       connectionsFinal: { color: '#7a5195', weight: 2.2, opacity: .9 },
+      structuralPatches: { color: '#237A4B', weight: .8, fillColor: '#237A4B', fillOpacity: .34 },
+      structuralConnections: { color: '#225ea8', weight: 2.2, opacity: .85 },
+      structuralGaps: { color: '#d0442c', weight: 2.2, dashArray: '7 5', opacity: .9 },
+      structuralRoute: { color: '#f28e2b', weight: 4, opacity: .95 },
+      comparisonPatches2021: { color: '#237A4B', weight: .8, fillColor: '#237A4B', fillOpacity: .36 },
+      comparisonPatches2023: { color: '#7a5195', weight: .8, fillColor: '#7a5195', fillOpacity: .34 },
+      comparisonConnections2021: { color: '#225ea8', weight: 2.2, opacity: .9 },
+      comparisonConnections2023: { color: '#f28e2b', weight: 2.2, opacity: .9 },
+      comparisonRoute2021: { color: '#0a4393', weight: 4, opacity: .95 },
+      comparisonRoute2023: { color: '#d0442c', weight: 4, opacity: .95 },
       corridors: { color: '#345a01', weight: 1.4, fillColor: '#a1d303', fillOpacity: .22 },
       criticalPoints: { color: '#b42318', weight: 2, fillColor: '#f04438', fillOpacity: .9, radius: 5 },
     };
@@ -105,21 +129,63 @@
       opacity: state.resultOpacity,
       attribution: 'Google Earth Engine',
       maxZoom: 18,
+      updateWhenIdle: true,
+      keepBuffer: 1,
     });
     state.resultLayers.set(key, {
       key,
       name,
       layer,
       color: classes[0]?.color || '#0a4393',
-      legend: classes.map((item) => ({name: item.etiqueta, color: item.color})),
+      legend: classes.map((item) => ({name: item.etiqueta || item.label || `Clase ${item.value}`, color: item.color})),
     });
     if (active) { layer.addTo(map); state.activeLayers.add(key); }
+  }
+
+  function previewAreaRequest() {
+    if (state.drawnGeometry) return {mode: 'draw', geometry: state.drawnGeometry};
+    if (state.wizard.areaMode === 'subbasin' && state.wizard.subbasin) {
+      return {mode: 'subbasin', subbasin: state.wizard.subbasin};
+    }
+    return {mode: 'basin'};
+  }
+
+  async function loadPreview(key, source, year = null) {
+    const previous = state.resultLayers.get(key);
+    if (previous?.layer && map.hasLayer(previous.layer)) map.removeLayer(previous.layer);
+    state.resultLayers.delete(key);
+    state.activeLayers.delete(key);
+    state.preview.loading.add(key);
+    renderLayers();
+    try {
+      const response = await api('/api/v1/layers/preview', {
+        method: 'POST',
+        body: JSON.stringify({source, year, area: previewAreaRequest()}),
+      });
+      addTileResultLayer(key, response.layer.legend, response.layer, true);
+      toast(`${response.layer.legend} está visible en el mapa.`, 'success');
+    } catch (error) {
+      toast(`No se pudo preparar la capa: ${error.message}`, 'error');
+    } finally {
+      state.preview.loading.delete(key);
+      renderLayers();
+      renderLegend();
+    }
+  }
+
+  function removePreview(key) {
+    const entry = state.resultLayers.get(key);
+    if (entry?.layer && map.hasLayer(entry.layer)) map.removeLayer(entry.layer);
+    state.resultLayers.delete(key);
+    state.activeLayers.delete(key);
+    renderLayers();
+    renderLegend();
   }
 
   function clearResultLayers() {
     state.resultLayers.forEach(({layer}) => { if (map.hasLayer(layer)) map.removeLayer(layer); });
     state.resultLayers.clear();
-    state.activeLayers = new Set(['basin']);
+    state.activeLayers = new Set(['basin', 'corridors', 'criticalPoints']);
   }
 
   function toggleLayer(key, active) {
@@ -141,17 +207,42 @@
 
   function renderLayers() {
     const basinRows = layerRow('basin', 'Límite de la CHCP', '#0a4393', true, 'GeoJSON local') + layerRow('subbasins', 'Subcuencas del Canal', '#77cc09', true, `${state.territory?.subbasins?.features?.length || 0} unidades`);
-    const corridorRows = layerRow('corridors', 'Corredores estratégicos publicados', '#a1d303', true, `${state.territory?.corridors?.features?.length || 0} polígonos`) + layerRow('criticalPoints', 'Puntos críticos publicados', '#f04438', true, `${state.territory?.critical_points?.features?.length || 0} puntos`);
-    const temporalRows = state.resultLayers.size
-      ? Array.from(state.resultLayers.values()).map((item) => layerRow(item.key, item.name, item.color, true, 'Resultado calculado')).join('')
+    const corridorRows = layerRow('corridors', 'Corredores publicados', '#a1d303', true, `${state.territory?.corridors?.features?.length || 0} polígonos`) + layerRow('criticalPoints', 'Puntos críticos publicados', '#f04438', true, `${state.territory?.critical_points?.features?.length || 0} puntos`);
+    const calculatedLayers = Array.from(state.resultLayers.values()).filter((item) => !item.key.startsWith('preview-'));
+    const temporalRows = calculatedLayers.length
+      ? calculatedLayers.map((item) => layerRow(item.key, item.name, item.color, true, 'Resultado calculado')).join('')
       : layerRow('pending', 'Ejecute un análisis para habilitar resultados', '#d6deeb', false);
-    const source = state.config?.sources?.[state.wizard.source];
-    const sourceInfo = source ? `<div class="source-note"><b>${esc(source.nombre)}</b><br>${source.anio_inicial}–${source.anio_final} · ${source.resolucion_m} m<br>${esc(source.definicion_bosque)}</div>` : '';
-    const complementaryRows = (state.sourceCatalog?.sources || [])
-      .filter((item) => item.categoria.startsWith('B'))
-      .map((item) => layerRow(`catalog-${item.clave}`, item.nombre_oficial, '#9aa7b8', false, item.estado_html))
-      .join('');
-    $('#panel-layers').innerHTML = group('Límites', basinRows) + group('Corredores publicados', corridorRows, false) + group('Cobertura y transiciones', temporalRows) + group('Fuente activa', sourceInfo, false) + (complementaryRows ? group('Fuentes complementarias', complementaryRows, false) : '') + group('ERI complementario', state.eri ? layerRow('eriTiles', 'Índice ERI indicativo', '#76b72a', state.resultLayers.has('eriTiles')) : layerRow('eriPending', 'Calcule el ERI desde Resultados', '#d6deeb', false), false);
+    const ndviChecked = state.activeLayers.has('preview-ndvi');
+    const officialChecked = state.activeLayers.has('preview-official');
+    const ndviYears = Array.from({length: 9}, (_, index) => 2017 + index).map((year) => `<option ${year === state.preview.ndviYear ? 'selected' : ''}>${year}</option>`).join('');
+    const yearOptions = (initial, final, selected) => Array.from({length: final - initial + 1}, (_, index) => initial + index).map((year) => `<option ${year === selected ? 'selected' : ''}>${year}</option>`).join('');
+    const officialProducts = [
+      ['1992_historico','Cobertura histórica 1992'],
+      ['2000_historico','Cobertura histórica 2000'],
+      ['2012_binario','Bosque / no bosque 2012'],
+      ['2012_detallado','Uso y cobertura 2012'],
+      ['2019_general','Cobertura general 2019'],
+      ['2021_general','Cobertura general oficial 2021'],
+      ['2021_detallado','Uso y cobertura detallada 2021'],
+      ['2023_general','Diagnóstico general 2023'],
+    ].map(([value,label]) => `<option value="${value}" ${value === state.preview.officialSource ? 'selected' : ''}>${label}</option>`).join('');
+    const vegetationRows = `<div class="layer-source-control ${state.preview.loading.has('preview-ndvi') ? 'is-loading' : ''}"><div class="ly-h"><span class="tg"><input type="checkbox" data-preview="ndvi" ${ndviChecked ? 'checked' : ''} ${state.preview.loading.has('preview-ndvi') ? 'disabled' : ''} aria-label="Mostrar Sentinel-2 NDVI"><span></span></span><i class="layer-color ndvi-ramp"></i><label class="nm">Sentinel-2 · NDVI<small>Vigor de la vegetación; vista anual sin estadísticas</small></label></div><label class="layer-source-select">Año<select data-preview-year ${state.preview.loading.has('preview-ndvi') ? 'disabled' : ''}>${ndviYears}</select></label></div>`;
+    const satelliteControl = (key, source, name, note, color, yearField = null, initial = null, final = null) => {
+      const layerKey = `preview-${key}`;
+      const checked = state.activeLayers.has(layerKey);
+      const loading = state.preview.loading.has(layerKey);
+      const year = yearField ? state.preview[yearField] : null;
+      const selector = yearField ? `<label class="layer-source-select">Año<select data-sat-year="${key}" ${loading ? 'disabled' : ''}>${yearOptions(initial, final, year)}</select></label>` : '';
+      return `<div class="layer-source-control ${loading ? 'is-loading' : ''}"><div class="ly-h"><span class="tg"><input type="checkbox" data-sat-preview="${key}" data-source="${source}" ${checked ? 'checked' : ''} ${loading ? 'disabled' : ''} aria-label="Mostrar ${esc(name)}"><span></span></span><i class="layer-color" style="background:${color}"></i><label class="nm">${esc(name)}<small>${esc(note)}</small></label></div>${selector}</div>`;
+    };
+    const satelliteRows = satelliteControl('jrc', 'jrc_tmf', 'JRC Tropical Moist Forest', 'Estado anual del bosque húmedo tropical', '#005a32', 'jrcYear', 1990, 2025)
+      + satelliteControl('hansen', 'hansen_gfc', 'Hansen Global Forest Change', 'Pérdida de cobertura arbórea por año', '#b42318', 'hansenYear', 2001, 2025)
+      + satelliteControl('esri', 'esri_lulc', 'ESRI Land Use / Land Cover', 'Cobertura anual de 10 m', '#397d49', 'esriYear', 2017, 2025)
+      + vegetationRows
+      + satelliteControl('gedi', 'gedi', 'GEDI · altura del dosel', 'Referencia estructural fija con cobertura parcial', '#225ea8');
+    const officialRows = `<div class="layer-source-control ${state.preview.loading.has('preview-official') ? 'is-loading' : ''}"><div class="ly-h"><span class="tg"><input type="checkbox" data-preview="official" ${officialChecked ? 'checked' : ''} ${state.preview.loading.has('preview-official') ? 'disabled' : ''} aria-label="Mostrar cobertura oficial"><span></span></span><i class="layer-color official-ramp"></i><label class="nm">Coberturas oficiales de Panamá<small>Productos independientes; no forman una serie comparable por defecto</small></label></div><label class="layer-source-select">Producto<select data-preview-product ${state.preview.loading.has('preview-official') ? 'disabled' : ''}>${officialProducts}</select></label></div><div class="source-note"><small>Activar una capa solo cambia el mapa. Fragmentación y conectividad se ejecutan desde Realizar análisis.</small></div>`;
+    const comparisonAction = `<div class="source-note structural-comparison-action"><b>Escenarios estructurales 2021 y 2023</b><small>Dos diagnósticos paralelos; no se interpreta como cambio causal.</small><button class="btn btn-s" id="compare-structural" type="button">Comparar conectividad 2021–2023</button></div>`;
+    $('#panel-layers').innerHTML = group('Resultados del análisis', temporalRows, true) + group('Señales satelitales', satelliteRows, true) + group('Conectividad y riesgos', corridorRows + comparisonAction, true) + group('Coberturas oficiales', officialRows, true) + group('Límites territoriales', basinRows, false) + group('ERI complementario', state.eri ? layerRow('eriTiles', 'Índice ERI indicativo', '#76b72a', state.resultLayers.has('eriTiles')) : layerRow('eriPending', 'Se habilita después de un resultado', '#d6deeb', false), false);
     $$('#panel-layers .lg>button').forEach((button) => button.addEventListener('click', () => button.parentElement.classList.toggle('open')));
     $$('[data-layer]', $('#panel-layers')).forEach((input) => input.addEventListener('change', () => {
       const key = input.dataset.layer;
@@ -163,6 +254,37 @@
       input.checked ? state.activeLayers.add(key) : state.activeLayers.delete(key);
       renderLegend();
     }));
+    $('#compare-structural')?.addEventListener('click', runStructuralComparison);
+    $('[data-preview="ndvi"]', $('#panel-layers'))?.addEventListener('change', (event) => {
+      if (event.target.checked) loadPreview('preview-ndvi', 'sentinel_ndvi', state.preview.ndviYear);
+      else removePreview('preview-ndvi');
+    });
+    $('[data-preview="official"]', $('#panel-layers'))?.addEventListener('change', (event) => {
+      if (event.target.checked) loadPreview('preview-official', state.preview.officialSource);
+      else removePreview('preview-official');
+    });
+    $$('[data-sat-preview]', $('#panel-layers')).forEach((input) => input.addEventListener('change', (event) => {
+      const key = event.target.dataset.satPreview;
+      const source = event.target.dataset.source;
+      const field = key === 'jrc' ? 'jrcYear' : key === 'hansen' ? 'hansenYear' : key === 'esri' ? 'esriYear' : null;
+      if (event.target.checked) loadPreview(`preview-${key}`, source, field ? state.preview[field] : null);
+      else removePreview(`preview-${key}`);
+    }));
+    $$('[data-sat-year]', $('#panel-layers')).forEach((select) => select.addEventListener('change', (event) => {
+      const key = event.target.dataset.satYear;
+      const field = key === 'jrc' ? 'jrcYear' : key === 'hansen' ? 'hansenYear' : 'esriYear';
+      const source = key === 'jrc' ? 'jrc_tmf' : key === 'hansen' ? 'hansen_gfc' : 'esri_lulc';
+      state.preview[field] = Number(event.target.value);
+      if (state.activeLayers.has(`preview-${key}`)) loadPreview(`preview-${key}`, source, state.preview[field]);
+    }));
+    $('[data-preview-year]', $('#panel-layers'))?.addEventListener('change', (event) => {
+      state.preview.ndviYear = Number(event.target.value);
+      if (state.activeLayers.has('preview-ndvi')) loadPreview('preview-ndvi', 'sentinel_ndvi', state.preview.ndviYear);
+    });
+    $('[data-preview-product]', $('#panel-layers'))?.addEventListener('change', (event) => {
+      state.preview.officialSource = event.target.value;
+      if (state.activeLayers.has('preview-official')) loadPreview('preview-official', state.preview.officialSource);
+    });
   }
 
   function renderLegend() {
@@ -185,6 +307,7 @@
       const response = await api(`/api/v1/territories/search?q=${encodeURIComponent(name)}`);
       const item = (response.results || []).find((candidate) => candidate.tipo === 'corredor' && candidate.nombre === name);
       if (!item) throw new Error('El corredor no tiene un identificador territorial disponible.');
+      const summary = await api(`/api/v1/territories/${encodeURIComponent(item.id)}/summary`);
       state.territoryId = item.id;
       state.wizard.areaMode = 'draw';
       state.wizard.subbasin = '';
@@ -195,6 +318,7 @@
       $('#selected-territory-id').textContent = `Territorio preparado: ${name}`;
       writePortalState({territoryId:item.id,territoryName:name,territoryType:'corredor'});
       updateAreaLabel();
+      renderPreparedTerritory(summary);
       toast(`${name} quedó preparado para el análisis.`, 'success');
     } catch (error) {
       toast(`No se pudo preparar el corredor: ${error.message}`, 'error');
@@ -209,11 +333,11 @@
         layer.bindTooltip(`${feature.properties?.nombre || 'Corredor publicado'} · clic para analizar`);
         layer.on('click', () => prepareCorridorFromMap(feature, layer));
       },
-    });
+    }).addTo(map);
     criticalPointLayer = L.geoJSON(state.territory.critical_points, {
       pointToLayer: (feature, latlng) => L.circleMarker(latlng, layerStyle('criticalPoints')),
       onEachFeature: (feature, layer) => layer.bindTooltip(feature.properties?.nombre || feature.properties?.titulo || 'Punto crítico publicado'),
-    });
+    }).addTo(map);
     map.fitBounds(basinLayer.getBounds(), { padding: [18, 18] });
   }
 
@@ -245,15 +369,9 @@
   }
 
   function renderQuickFilters() {
-    const sourceSelect = $('#quick-source');
-    sourceSelect.innerHTML = Object.values(state.config.sources).map((source) => `<option value="${source.clave}" ${source.clave === state.wizard.source ? 'selected' : ''}>${esc(source.nombre)}</option>`).join('');
-    selectYears(state.wizard.source, $('#quick-initial-year'), $('#quick-final-year'));
     $('#quick-distance').value = String(state.wizard.maximumDistance);
     $('#layer-opacity').value = String(Math.round(state.resultOpacity * 100));
     $('#layer-opacity-value').textContent = `${Math.round(state.resultOpacity * 100)} %`;
-    sourceSelect.onchange = () => { state.wizard.source = sourceSelect.value; selectYears(state.wizard.source, $('#quick-initial-year'), $('#quick-final-year')); renderLayers(); persistWizard(); };
-    $('#quick-initial-year').onchange = (event) => { state.wizard.initialYear = Number(event.target.value); persistWizard(); };
-    $('#quick-final-year').onchange = (event) => { state.wizard.finalYear = Number(event.target.value); persistWizard(); };
     $('#quick-distance').onchange = (event) => { state.wizard.maximumDistance = Number(event.target.value); persistWizard(); };
     $('#layer-opacity').oninput = (event) => {
       state.resultOpacity = Number(event.target.value) / 100;
@@ -264,28 +382,87 @@
       });
       writePortalState({resultOpacity:state.resultOpacity});
     };
-    const evidenceSource = $('#evidence-source');
-    const refreshEvidence = () => {
-      const fixed = ['gedi','worldcover'].includes(evidenceSource.value);
-      $('#evidence-years').hidden = fixed;
-      $('#evidence-note').textContent = fixed ? 'Producto de referencia fija; no se fabrica una serie anual.' : evidenceSource.value === 'hansen_gfc' ? 'Pérdida anual 2001–2025; no equivale automáticamente a deforestación.' : 'Mediana anual con máscara SCL y respaldo del año anterior donde falten observaciones.';
-      if (evidenceSource.value === 'sentinel_ndvi') { $('#evidence-initial').min='2017'; $('#evidence-final').max='2026'; }
-      else { $('#evidence-initial').min='2001'; $('#evidence-final').max='2025'; }
-    };
-    evidenceSource.onchange = refreshEvidence;
-    refreshEvidence();
-    $('#run-evidence').onclick = runEvidence;
+  }
+
+  async function runStructuralConnectivity(scenario, scope = 'connectivity') {
+    if (state.wizard.areaMode === 'draw' && !state.drawnGeometry) { toast('Dibuje un polígono o seleccione un territorio antes de calcular.', 'error'); return; }
+    $('#open-analysis').disabled = true;
+    setBusy(true, scope === 'fragmentation' ? 'Calculando fragmentación oficial 2021' : scenario === 'official_2021' ? 'Calculando conectividad oficial 2021' : 'Calculando escenario diagnóstico 2023', ['Validando el área', 'Consultando cobertura oficial', 'Preparando parches', 'Construyendo red', 'Preparando resultados']);
+    try {
+      const response = await api('/api/v1/structural-connectivity', {method:'POST', body:JSON.stringify({area:currentAreaRequest(), scenario, maximum_distance_m:state.wizard.maximumDistance, minimum_patch_area_ha:state.wizard.minimumPatchArea, territory_id:state.territoryId})});
+      state.result = response;
+      state.lastAnalysisFingerprint = selectionFingerprint();
+      renderStructuralConnectivity(response, scope);
+      $('#download-result').disabled = false;
+      writePortalState({resultId:response.result_id,resultTerritoryId:state.territoryId,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:state.territoryId,analysisError:null});
+      toast(response.cache_hit ? 'Se reutilizó la estructura ya calculada.' : scope === 'fragmentation' ? 'Fragmentación calculada.' : 'Conectividad estructural calculada.');
+    } catch (error) { toast(error.message, 'error'); }
+    finally { stopBusy(); $('#open-analysis').disabled = false; }
+  }
+
+  async function runStructuralComparison() {
+    if (state.wizard.areaMode === 'draw' && !state.drawnGeometry) {
+      toast('Dibuje un polígono o seleccione un territorio antes de comparar.', 'error');
+      return;
+    }
+    $('#open-analysis').disabled = true;
+    setBusy(true, 'Comparando escenarios estructurales 2021 y 2023', [
+      'Validando el área y los parámetros comunes',
+      'Preparando estructura oficial 2021',
+      'Preparando escenario diagnóstico 2023',
+      'Construyendo las dos redes',
+      'Presentando diagnósticos paralelos',
+    ]);
+    try {
+      const response = await api('/api/v1/structural-comparison', {
+        method:'POST',
+        body:JSON.stringify({
+          area:currentAreaRequest(),
+          maximum_distance_m:state.wizard.maximumDistance,
+          minimum_patch_area_ha:state.wizard.minimumPatchArea,
+          territory_id:state.territoryId,
+        }),
+      });
+      state.result = response;
+      state.lastAnalysisFingerprint = null;
+      renderStructuralComparison(response);
+      $('#download-result').disabled = false;
+      writePortalState({resultId:response.result_id,resultTerritoryId:state.territoryId,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:state.territoryId,analysisError:null});
+      toast(response.cache_hit ? 'Se reutilizó la comparación estructural.' : 'Comparación estructural completada.');
+    } catch (error) {
+      toast(error.message, 'error');
+    } finally {
+      stopBusy();
+      $('#open-analysis').disabled = false;
+    }
+  }
+
+  async function runOfficialCoverage() {
+    if (state.wizard.areaMode === 'draw' && !state.drawnGeometry) { toast('Dibuje un polígono o seleccione un territorio antes de consultar.', 'error'); return; }
+    const year = state.wizard.officialCoverageYear;
+    $('#open-analysis').disabled = true;
+    setBusy(true, `Consultando cobertura ${year}`, ['Validando el área', `Consultando la fuente ${year}`, 'Calculando superficies por categoría', 'Preparando resultados']);
+    try {
+      const response = await api(`/api/v1/official-coverages/${year}`, {method:'POST', body:JSON.stringify({area:currentAreaRequest(), territory_id:state.territoryId})});
+      state.result = response;
+      state.lastAnalysisFingerprint = null;
+      renderOfficialCoverage(response);
+      $('#download-result').disabled = false;
+      writePortalState({resultId:response.result_id,resultTerritoryId:state.territoryId,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:state.territoryId,analysisError:null});
+      toast(year === 2021 ? 'Cobertura institucional 2021 consultada.' : 'Cobertura diagnóstica 2023 consultada por código.');
+    } catch (error) { toast(error.message, 'error'); }
+    finally { stopBusy(); $('#open-analysis').disabled = false; }
   }
 
   async function runEvidence() {
     if (state.wizard.areaMode === 'draw' && !state.drawnGeometry) { toast('Dibuje un polígono o seleccione un territorio antes de calcular.', 'error'); return; }
-    const source = $('#evidence-source').value;
-    const payload = {source, area:currentAreaRequest(), initial_year:Number($('#evidence-initial').value), final_year:Number($('#evidence-final').value), parameters:{tree_cover_threshold:30}, territory_id:state.territoryId};
+    const source = state.wizard.evidenceSource;
+    const payload = {source, area:currentAreaRequest(), initial_year:state.wizard.initialYear, final_year:state.wizard.finalYear, parameters:{tree_cover_threshold:30}, territory_id:state.territoryId};
     if (['gedi','worldcover'].includes(source)) { payload.initial_year = null; payload.final_year = null; }
     const sequence = ++state.requestSequence;
     writePortalState({analysisStatus:'processing',analysisTerritoryId:state.territoryId,analysisLabel:`${source} · evidencia complementaria`,analysisError:null});
-    setBusy(true, 'Calculando evidencia complementaria');
-    $('#run-evidence').disabled = true;
+    setBusy(true, 'Calculando evidencia complementaria', ['Validando el área', 'Consultando la fuente seleccionada', 'Calculando estadísticas', 'Preparando resultados']);
+    $('#open-analysis').disabled = true;
     try {
       const response = await api('/api/v1/evidence', {method:'POST', body:JSON.stringify(payload)});
       if (sequence !== state.requestSequence) {
@@ -301,7 +478,7 @@
       writePortalState({analysisStatus:'error',analysisTerritoryId:payload.territory_id,analysisError:error.message});
       toast(error.message, 'error');
     }
-    finally { stopBusy(); $('#run-evidence').disabled = false; }
+    finally { stopBusy(); $('#open-analysis').disabled = false; }
   }
 
   function renderEvidenceResult(response) {
@@ -428,15 +605,22 @@
   }
 
   function renderAnalysisStep(body) {
-    const allSelected = state.wizard.analyses.length === 3;
-    const options = state.config.analyses.map((item) => `<label class="opt"><input type="checkbox" data-analysis="${item.key}" ${state.wizard.analyses.includes(item.key) ? 'checked' : ''}><span class="layer-color" style="background:${item.key === 'coverage' ? '#1f8a70' : item.key === 'fragmentation' ? '#e76f51' : '#7a5195'}"></span><div><b>${esc(item.name)}</b><span>${esc(item.description)}</span></div></label>`).join('');
-    body.innerHTML = `<h3>¿Qué quiere analizar?</h3><p class="sub">El motor recalcula cada período con parámetros equivalentes.</p><div class="wizard-analysis-grid"><label class="opt integral"><input type="checkbox" id="analysis-integral" ${allSelected ? 'checked' : ''}><span class="layer-color" style="background:#0a4393"></span><div><b>Análisis integral</b><span>Cobertura, fragmentación y conectividad en una sola ejecución.</span></div></label>${options}</div>`;
-    $('#analysis-integral').onchange = (event) => { state.wizard.analyses = event.target.checked ? ['coverage', 'fragmentation', 'connectivity'] : ['coverage']; renderWizard(); };
-    $$('[data-analysis]', body).forEach((input) => input.onchange = () => {
-      const selected = $$('[data-analysis]:checked', body).map((item) => item.dataset.analysis);
-      state.wizard.analyses = selected.length ? selected : ['coverage'];
-      $('#analysis-integral').checked = state.wizard.analyses.length === 3;
+    const components = [
+      ['ecological','Preevaluación territorial','#0a4393','Calcula primero las cinco señales y el índice territorial. No prepara parches.'],
+      ['fragmentation','Fragmentación','#1f8a70','Mide superficie forestal, número, tamaño, densidad y bordes de los parches oficiales 2021.'],
+      ['connectivity','Conectividad','#225ea8','Construye la red estructural, componentes, aislamiento, brechas y ruta potencial hacia corredores.'],
+    ];
+    const integral = state.wizard.mode === 'integral';
+    body.innerHTML = `<h3>¿Qué quiere analizar?</h3><p class="sub">Puede combinar uno o varios componentes. Cada resultado conserva su fórmula y fuente.</p><div class="wizard-analysis-grid">${components.map(([key,name,color,note]) => `<label class="opt"><input type="checkbox" name="analysis-component" value="${key}" ${state.wizard.selectedComponents.includes(key) ? 'checked' : ''} ${integral ? 'disabled' : ''}><span class="layer-color" style="background:${color}"></span><div><b>${name}</b><span>${note}</span></div></label>`).join('')}</div><div class="analysis-or"><span>o ejecute los tres componentes</span></div><label class="opt integral"><input type="checkbox" id="analysis-integral" ${integral ? 'checked' : ''}><span class="layer-color" style="background:#7a5195"></span><div><b>Análisis integral</b><span>Selecciona preevaluación, fragmentación y conectividad. Es exclusivo para evitar combinaciones duplicadas.</span></div></label><div class="review-note">La comparación temporal, las coberturas oficiales y las fuentes complementarias se consultan desde el Panel territorial.</div>`;
+    $$('input[name="analysis-component"]', body).forEach((input) => input.onchange = () => {
+      state.wizard.mode = 'custom';
+      state.wizard.selectedComponents = $$('input[name="analysis-component"]:checked', body).map((item) => item.value);
     });
+    $('#analysis-integral').onchange = (event) => {
+      state.wizard.mode = event.target.checked ? 'integral' : 'custom';
+      state.wizard.selectedComponents = event.target.checked ? ['ecological','fragmentation','connectivity'] : ['ecological'];
+      renderAnalysisStep(body);
+    };
   }
 
   function renderAreaStep(body) {
@@ -454,38 +638,45 @@
   }
 
   function renderParameterStep(body) {
-    const sources = Object.values(state.config.sources);
-    body.innerHTML = `<h3>Fuente, período y parámetros</h3><p class="sub">JRC y ESRI se calculan independientemente. La modalidad integrada compara sus resultados sin fusionarlos.</p><div class="fld"><label for="wizard-source">Fuente temporal</label><select id="wizard-source">${sources.map((source) => `<option value="${source.clave}" ${source.clave === state.wizard.source ? 'selected' : ''}>${esc(source.nombre)} · ${source.resolucion_m} m</option>`).join('')}</select></div><div class="parameter-grid"><div class="fld"><label for="wizard-initial">Año inicial</label><select id="wizard-initial"></select></div><div class="fld"><label for="wizard-final">Año final</label><select id="wizard-final"></select></div><div class="fld"><label for="wizard-distance">Distancia máxima</label><select id="wizard-distance">${[100,250,500,750,1000,1500,2000].map((value) => `<option value="${value}" ${value === state.wizard.maximumDistance ? 'selected' : ''}>${value} m</option>`).join('')}</select></div><div class="fld"><label for="wizard-min-area">Área mínima de parche</label><input id="wizard-min-area" type="number" min="0" max="500" step="0.1" value="${state.wizard.minimumPatchArea}"><span class="hint">Hectáreas; se aplica igual en ambos años.</span></div></div><div class="source-note" id="wizard-source-note"></div>`;
-    const sourceSelect = $('#wizard-source');
-    const initial = $('#wizard-initial');
-    const final = $('#wizard-final');
-    const updateSource = () => {
-      state.wizard.source = sourceSelect.value;
-      selectYears(state.wizard.source, initial, final);
-      const source = state.config.sources[state.wizard.source];
-      $('#wizard-source-note').innerHTML = `<b>${esc(source.definicion_bosque)}</b><br>${esc(source.limitacion)}`;
-    };
-    updateSource();
-    sourceSelect.onchange = updateSource;
-    initial.onchange = (event) => { state.wizard.initialYear = Number(event.target.value); };
-    final.onchange = (event) => { state.wizard.finalYear = Number(event.target.value); };
-    $('#wizard-distance').onchange = (event) => { state.wizard.maximumDistance = Number(event.target.value); };
-    $('#wizard-min-area').oninput = (event) => { state.wizard.minimumPatchArea = Math.max(0, Number(event.target.value) || 0); };
+    const selected = state.wizard.selectedComponents;
+    const needsStructure = selected.includes('fragmentation') || selected.includes('connectivity');
+    if (!needsStructure) {
+      body.innerHTML = `<h3>Períodos científicos fijos</h3><p class="sub">Esta primera etapa calcula solamente las cinco señales y el índice original.</p><dl class="rev"><dt>JRC TMF</dt><dd>Estado 2025</dd><dt>Hansen</dt><dd>Pérdida posterior al 31/12/2020</dd><dt>ESRI</dt><dd>Transición Trees 2017–2024</dd><dt>Sentinel-2 NDVI</dt><dd>2020–2025</dd><dt>GEDI</dt><dd>Altura de dosel como contexto</dd></dl><div class="review-note">No se preparan parches en esta modalidad. El mapa de coincidencia orienta dónde revisar y no suma puntos.</div>`;
+      return;
+    }
+    if (needsStructure) {
+      const selectedNames = selected.map((key) => ({ecological:'preevaluación territorial',fragmentation:'fragmentación',connectivity:'conectividad'}[key])).join(', ');
+      body.innerHTML = `<h3>Parámetros estructurales</h3><p class="sub">Componentes seleccionados: ${esc(selectedNames)}.</p><div class="source-note"><b>SINIA–MiAMBIENTE · Bosques y Otras Tierras Boscosas</b><br>Referencia oficial 2021. No se considera equivalente a JRC o ESRI.</div><div class="parameter-grid"><div class="fld"><label for="wizard-distance">Distancia máxima</label><select id="wizard-distance">${[100,250,500,750,1000,1500,2000].map((value) => `<option value="${value}" ${value === state.wizard.maximumDistance ? 'selected' : ''}>${value} m</option>`).join('')}</select></div><div class="fld"><label for="wizard-min-area">Área mínima de parche</label><input id="wizard-min-area" type="number" min="0" max="500" step="0.1" value="${state.wizard.minimumPatchArea}"><span class="hint">Hectáreas. Cero conserva todos los parches identificados.</span></div></div>`;
+      $('#wizard-distance').onchange = (event) => { state.wizard.maximumDistance = Number(event.target.value); };
+      $('#wizard-min-area').oninput = (event) => { state.wizard.minimumPatchArea = Math.max(0, Number(event.target.value) || 0); };
+      return;
+    }
   }
 
   function renderReviewStep(body) {
-    const source = state.config.sources[state.wizard.source];
-    const names = state.wizard.analyses.map((key) => state.config.analyses.find((item) => item.key === key)?.name).filter(Boolean).join(', ');
-    body.innerHTML = `<h3>Revise antes de ejecutar</h3><dl class="rev"><dt>Análisis</dt><dd>${esc(names)}</dd><dt>Área</dt><dd>${esc(areaLabel())}</dd><dt>Fuente</dt><dd>${esc(source.nombre)}</dd><dt>Período</dt><dd>${state.wizard.initialYear}–${state.wizard.finalYear}</dd><dt>Resolución nominal</dt><dd>${source.resolucion_m} m</dd><dt>Distancia entre parches</dt><dd>${number(state.wizard.maximumDistance, 0)} m</dd><dt>Área mínima</dt><dd>${number(state.wizard.minimumPatchArea, 1)} ha</dd></dl><div class="review-note">El resultado es indicativo. El ERI se calcula por separado y no altera las métricas temporales.</div>`;
+    const selected = state.wizard.selectedComponents;
+    const names = selected.map((key) => ({ecological:'Preevaluación territorial',fragmentation:'Fragmentación',connectivity:'Conectividad'}[key]));
+    const needsStructure = selected.includes('fragmentation') || selected.includes('connectivity');
+    if (!needsStructure) {
+      body.innerHTML = `<h3>Revise antes de ejecutar</h3><dl class="rev"><dt>Modo</dt><dd>Preevaluación territorial</dd><dt>Área</dt><dd>${esc(areaLabel())}</dd><dt>Resultado inmediato</dt><dd>Cinco señales, índice de indicios, consistencia y prioridad territorial</dd><dt>Parches y red</dt><dd>No se calculan en esta modalidad</dd></dl><div class="review-note">Resultado indicativo; requiere interpretación y verificación de campo.</div>`;
+      return;
+    }
+    if (needsStructure) {
+      body.innerHTML = `<h3>Revise antes de ejecutar</h3><dl class="rev"><dt>Componentes</dt><dd>${esc(names.join(', '))}</dd><dt>Área</dt><dd>${esc(areaLabel())}</dd><dt>Fuente estructural</dt><dd>SINIA–MiAMBIENTE 2021</dd><dt>Distancia</dt><dd>${number(state.wizard.maximumDistance,0)} m</dd><dt>Área mínima</dt><dd>${number(state.wizard.minimumPatchArea,1)} ha</dd></dl><div class="review-note">La conectividad es estructural potencial y no demuestra desplazamiento de fauna.</div>`;
+      return;
+    }
   }
 
   $('#wizard-back').addEventListener('click', () => { if (state.wizardStep > 0) { state.wizardStep -= 1; renderWizard(); } });
   $('#wizard-next').addEventListener('click', () => {
+    if (state.wizardStep === 0 && !state.wizard.selectedComponents.length) {
+      $('#wizard-error').textContent = 'Seleccione al menos un componente.';
+      return;
+    }
     if (state.wizardStep === 1) {
       if (state.wizard.areaMode === 'draw' && !state.drawnGeometry) { $('#wizard-error').textContent = 'Dibuje un polígono antes de continuar.'; return; }
       if (state.wizard.areaMode === 'subbasin' && !state.wizard.subbasin) { $('#wizard-error').textContent = 'Seleccione una subcuenca.'; return; }
     }
-    if (state.wizardStep === 2 && state.wizard.initialYear >= state.wizard.finalYear) { $('#wizard-error').textContent = 'El año inicial debe ser anterior al final.'; return; }
     if (state.wizardStep < 3) { state.wizardStep += 1; renderWizard(); return; }
     closeWizard();
     runAnalysis();
@@ -493,7 +684,7 @@
 
   function analysisPayload() {
     return {
-      analyses: state.wizard.analyses,
+      analyses: state.wizard.selectedComponents,
       area: currentAreaRequest(),
       source: state.wizard.source,
       initial_year: state.wizard.initialYear,
@@ -509,43 +700,67 @@
   }
 
   async function runAnalysis() {
-    persistWizard();
-    const requestSequence = ++state.requestSequence;
-    const payload = analysisPayload();
-    const fingerprint = JSON.stringify(payload);
-    writePortalState({analysisStatus:'processing',analysisTerritoryId:payload.territory_id,analysisLabel:`${payload.source} · ${payload.initial_year}–${payload.final_year}`,analysisError:null});
-    setBusy(true, 'Calculando análisis científico');
+    const fingerprint = selectionFingerprint();
+    if (state.result && state.lastAnalysisFingerprint === fingerprint) {
+      toast('Este resultado ya corresponde al área y los parámetros seleccionados. No fue necesario recalcular.');
+      return;
+    }
+    const selected = state.wizard.selectedComponents;
+    const ecological = selected.includes('ecological');
+    const fragmentation = selected.includes('fragmentation');
+    const connectivity = selected.includes('connectivity');
+    if (selected.length === 1 && ecological) { await runEcologicalEvaluation(); return; }
+    if (!ecological && selected.length === 1 && fragmentation) { await runStructuralConnectivity('official_2021', 'fragmentation'); return; }
+    if (!ecological && connectivity) { await runStructuralConnectivity('official_2021', 'connectivity'); return; }
+    if (!ecological && fragmentation && connectivity) { await runStructuralConnectivity('official_2021', 'connectivity'); return; }
+    await runIntegratedEvaluation(selected);
+  }
+
+  async function runEcologicalEvaluation() {
+    const sequence = ++state.requestSequence;
+    setBusy(true, 'Calculando preevaluación territorial', ['Validando el área', 'Consultando las cinco señales', 'Calculando el índice territorial', 'Preparando resultados']);
     $('#open-analysis').disabled = true;
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 420000);
-      const response = await api('/api/v1/analyses', {method: 'POST', body: JSON.stringify(payload), signal: controller.signal});
-      clearTimeout(timer);
-      if (requestSequence !== state.requestSequence || fingerprint !== selectionFingerprint()) {
-        writePortalState({resultId:response.result_id,resultTerritoryId:payload.territory_id,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:payload.territory_id,analysisError:null});
-        toast('El análisis terminó, pero la selección cambió. El resultado se guardó sin reemplazar la vista activa.');
-        return;
-      }
+      const response = await api('/api/v1/evaluations/ecological', {method:'POST', body:JSON.stringify({area:currentAreaRequest(), territory_id:state.territoryId})});
+      if (sequence !== state.requestSequence) return;
       state.result = response;
+      state.lastAnalysisFingerprint = selectionFingerprint();
       state.eri = null;
-      renderAnalysisResult(response);
+      renderEcologicalEvaluation(response);
       $('#download-result').disabled = false;
-      writePortalState({
-        resultId: response.result_id,
-        resultTerritoryId: state.territoryId,
-        resultCreatedUtc: response.created_utc,
-        resultSource: state.wizard.source,
-        resultInitialYear: state.wizard.initialYear,
-        resultFinalYear: state.wizard.finalYear,
-        analysisStatus: 'available',
-        analysisTerritoryId: payload.territory_id,
-        analysisError: null,
-      });
-      toast(response.cache_hit ? 'Se reutilizó un resultado idéntico en caché.' : 'Análisis completado.');
+      writePortalState({resultId:response.result_id,resultTerritoryId:state.territoryId,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:state.territoryId,analysisError:null});
+      toast(response.cache_hit ? 'Se reutilizó la misma preevaluación.' : 'Preevaluación territorial completada.');
+    } catch (error) { toast(error.message, 'error'); }
+    finally { stopBusy(); $('#open-analysis').disabled = false; }
+  }
+
+  async function runIntegratedEvaluation(selectedComponents = ['ecological','fragmentation','connectivity']) {
+    const sequence = ++state.requestSequence;
+    $('#open-analysis').disabled = true;
+    try {
+      setBusy(true, 'Etapa 1 de 2 · Preevaluación territorial', ['Validando el área', 'Consultando las cinco señales', 'Calculando el índice territorial', 'Mostrando el primer resultado']);
+      const ecological = await api('/api/v1/evaluations/ecological', {method:'POST', body:JSON.stringify({area:currentAreaRequest(), territory_id:state.territoryId})});
+      if (sequence !== state.requestSequence) return;
+      state.result = ecological;
+      renderEcologicalEvaluation(ecological);
+      $('#download-result').disabled = false;
+      // La preevaluación es un resultado científico completo por sí mismo. Se
+      // sincroniza de inmediato con el Panel antes de iniciar la estructura,
+      // para no perderla si la cobertura institucional no está disponible.
+      writePortalState({resultId:ecological.result_id,resultTerritoryId:state.territoryId,resultCreatedUtc:ecological.created_utc,analysisStatus:'available',analysisTerritoryId:state.territoryId,analysisError:null});
+      toast('Preevaluación lista. Continúa la estructura oficial 2021.');
+
+      setBusy(true, 'Etapa 2 de 2 · Estructura oficial 2021', ['Reutilizando la preevaluación', 'Consultando cobertura oficial', 'Preparando parches', 'Construyendo red', 'Integrando resultados']);
+      const response = await api('/api/v1/evaluations/integrated', {method:'POST', body:JSON.stringify({area:currentAreaRequest(), maximum_distance_m:state.wizard.maximumDistance, minimum_patch_area_ha:state.wizard.minimumPatchArea, selected_components:selectedComponents, territory_id:state.territoryId})});
+      if (sequence !== state.requestSequence) return;
+      state.result = response;
+      state.lastAnalysisFingerprint = selectionFingerprint();
+      state.eri = null;
+      renderIntegratedEvaluation(response);
+      writePortalState({resultId:response.result_id,resultTerritoryId:state.territoryId,resultCreatedUtc:response.created_utc,analysisStatus:'available',analysisTerritoryId:state.territoryId,analysisError:null});
+      toast(response.cache_hit ? 'Se reutilizó el análisis integral.' : 'Análisis integral completado.');
     } catch (error) {
-      const suffix = error.supportId ? ` Código de soporte: ${error.supportId}.` : '';
-      writePortalState({analysisStatus:'error',analysisTerritoryId:payload.territory_id,analysisError:`${error.message}${suffix}`});
-      toast(`${error.name === 'AbortError' ? 'El análisis superó el tiempo de espera.' : error.message}${suffix}`, 'error');
+      toast(error.message, 'error');
     } finally {
       stopBusy();
       $('#open-analysis').disabled = false;
@@ -583,10 +798,54 @@
     renderLegend();
   }
 
-  function metric(label, value, note = '') { return `<div class="metric-card"><span>${esc(label)}</span><b>${esc(value)}</b>${note ? `<small>${esc(note)}</small>` : ''}</div>`; }
+  function metric(label, value, note = '') {
+    const normalized = String(label).toLowerCase();
+    const tone = /pérdida|deforest|degrad|aislad|brecha/.test(normalized) ? 'loss'
+      : /bosque|regener|cobertura/.test(normalized) ? 'forest'
+      : /conex|componente|red|corredor/.test(normalized) ? 'network'
+      : /prioridad|visita/.test(normalized) ? 'priority' : 'neutral';
+    return `<div class="metric-card" data-tone="${tone}"><span>${esc(label)}</span><b>${esc(value)}</b>${note ? `<small>${esc(note)}</small>` : ''}</div>`;
+  }
   function barChart(rows) {
     const maximum = Math.max(1, ...rows.map((row) => Math.abs(Number(row.value || 0))));
     return `<div class="bar-chart">${rows.map((row) => `<div class="bar-row"><span>${esc(row.label)}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.max(1, Math.abs(Number(row.value || 0)) / maximum * 100)}%;background:${row.color}"></div></div><span class="bar-value">${esc(row.formatted)}</span></div>`).join('')}</div>`;
+  }
+
+  const scientificTabLabels = {
+    summary: 'Resumen', forest: 'Dinámica del bosque',
+    connectivity: 'Fragmentación y conectividad', coverages: 'Coberturas oficiales',
+  };
+
+  function mountScientificViews(views, initial = 'summary') {
+    const normalized = {...views};
+    if (normalized.corridors) {
+      normalized.connectivity = `${normalized.connectivity || ''}<section class="embedded-science"><h3>Corredores y contexto territorial</h3>${normalized.corridors}</section>`;
+    }
+    if (normalized.report) {
+      normalized.summary = `${normalized.summary || ''}<details class="scientific-details"><summary>Interpretación, limitaciones e informe</summary><div>${normalized.report}</div></details>`;
+    }
+    const order = ['summary','forest','connectivity','coverages'];
+    const entries = order.filter((key) => Boolean(normalized[key])).map((key) => [key, normalized[key]]);
+    const active = entries.some(([key]) => key === initial) ? initial : entries[0]?.[0];
+    const navigation = $('#results-navigation');
+    navigation.hidden = false;
+    navigation.innerHTML = `<div class="result-tabs scientific-result-tabs" role="tablist" aria-label="Secciones del resultado">${entries.map(([key]) => `<button role="tab" data-result-tab="${key}" aria-selected="${key === active}">${scientificTabLabels[key] || key}</button>`).join('')}</div>`;
+    $('#results-body').innerHTML = entries.map(([key, content]) => `<section class="result-view scientific-result-view" id="view-${key}" role="tabpanel" ${key === active ? '' : 'hidden'}>${content}</section>`).join('');
+    const panel = $('#results-panel');
+    panel.classList.remove('closed');
+    $('#results-reopen').hidden = true;
+    $$('[data-result-tab]', panel).forEach((button) => button.addEventListener('click', () => {
+      $$('[data-result-tab]', panel).forEach((item) => item.setAttribute('aria-selected', String(item === button)));
+      entries.forEach(([key]) => { $(`#view-${key}`).hidden = button.dataset.resultTab !== key; });
+    }));
+  }
+
+  function corridorResultView(response) {
+    const context = response.corridor_context || {};
+    const corridors = context.corredores || [];
+    const cards = `${metric('Área en corredores',hectares(context.area_en_corredores_ha || 0),`${number(context.porcentaje_aoi_en_corredores || 0,1)} % del territorio`)}${metric('Corredores intersectados',number(corridors.length,0),context.intersecta ? 'Intersección publicada' : 'Sin intersección')}${metric('Distancia al más cercano',context.distancia_corredor_mas_cercano_m == null ? 'No disponible' : `${number(context.distancia_corredor_mas_cercano_m,0)} m`,'Distancia geométrica')}${metric('Corredor Mesoamericano',context.intersecta_mesoamericano ? 'Intersecta' : 'No intersecta',context.fuente || 'Contexto publicado')}`;
+    const list = corridors.length ? `<div class="scientific-table-wrap"><table class="scientific-table"><thead><tr><th>Corredor</th><th>Categoría</th><th>Intersección</th></tr></thead><tbody>${corridors.map((item) => `<tr><td>${esc(item.nombre || 'Sin nombre')}</td><td>${esc(item.categoria_etiqueta || item.categoria || '—')}</td><td>${hectares(item.interseccion_ha || 0)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-result"><h3>Sin intersecciones publicadas</h3><p>El análisis mantiene la distancia al corredor más cercano cuando está disponible.</p></div>';
+    return `<div class="metric-grid">${cards}</div>${list}<div class="interpretation technical"><b>Alcance.</b> Los corredores publicados aportan contexto territorial. Las conexiones modeladas son relaciones estructurales potenciales y no demuestran desplazamiento de fauna.</div>`;
   }
 
   function resultViews(response) {
@@ -634,23 +893,226 @@
   }
 
   function renderAnalysisResult(response) {
-    if (response.kind === 'complementary_evidence') { renderEvidenceResult(response); return; }
-    renderAnalysisMap(response);
-    const views = resultViews(response);
-    $('#results-title').textContent = 'Resultado del análisis';
-    $('#results-subtitle').textContent = `${response.area.label} · ${response.result.anio_inicial}–${response.result.anio_final}`;
-    const tabs = ['summary','charts',...(views.concordance ? ['concordance'] : []),'interpretation','eri'];
-    const labels = {summary:'Lectura',charts:'Gráficas',concordance:'Concordancia',interpretation:'Interpretación',eri:'ERI'};
-    $('#results-body').innerHTML = `<div class="result-tabs" role="tablist">${tabs.map((key,index) => `<button role="tab" data-result-tab="${key}" aria-selected="${index === 0}">${labels[key]}</button>`).join('')}</div>${tabs.map((key,index) => `<div class="result-view" id="view-${key}" ${index ? 'hidden' : ''}>${views[key]}</div>`).join('')}<a class="btn btn-s download-link" href="/api/v1/results/${response.result_id}/download.zip">Descargar resultados y metadatos</a>`;
-    const panel = $('#results-panel');
-    panel.classList.remove('closed');
-    $('#results-reopen').hidden = true;
-    $$('[data-result-tab]', panel).forEach((button) => button.addEventListener('click', () => {
-      $$('[data-result-tab]', panel).forEach((item) => item.setAttribute('aria-selected', String(item === button)));
-      tabs.forEach((key) => { $(`#view-${key}`).hidden = button.dataset.resultTab !== key; });
-    }));
-    $('#calculate-eri').addEventListener('click', calculateEri);
-    setTimeout(() => map.invalidateSize(), 220);
+    if (response.kind === 'complementary_evidence') renderEvidenceResult(response);
+    else if (response.kind === 'ecological_evaluation') renderEcologicalEvaluation(response);
+    else if (response.kind === 'integrated_ecological_analysis') renderIntegratedEvaluation(response);
+    else if (response.kind === 'official_coverage_2021' || response.kind === 'official_coverage_2023') renderOfficialCoverage(response);
+    else if (response.kind === 'structural_connectivity') renderStructuralConnectivity(response);
+    else if (response.kind === 'structural_comparison_2021_2023') renderStructuralComparison(response);
+    else {
+      renderAnalysisMap(response);
+      const views = resultViews(response);
+      $('#results-title').textContent = 'Resultado del análisis';
+      $('#results-subtitle').textContent = `${response.area.label} · ${response.result.anio_inicial}–${response.result.anio_final}`;
+      const tabs = ['summary','charts',...(views.concordance ? ['concordance'] : []),'interpretation','eri'];
+      const labels = {summary:'Lectura',charts:'Gráficas',concordance:'Concordancia',interpretation:'Interpretación',eri:'ERI'};
+      $('#results-body').innerHTML = `<div class="result-tabs" role="tablist">${tabs.map((key,index) => `<button role="tab" data-result-tab="${key}" aria-selected="${index === 0}">${labels[key]}</button>`).join('')}</div>${tabs.map((key,index) => `<div class="result-view" id="view-${key}" ${index ? 'hidden' : ''}>${views[key]}</div>`).join('')}`;
+      const panel = $('#results-panel');
+      panel.classList.remove('closed');
+      $('#results-reopen').hidden = true;
+      $$('[data-result-tab]', panel).forEach((button) => button.addEventListener('click', () => {
+        $$('[data-result-tab]', panel).forEach((item) => item.setAttribute('aria-selected', String(item === button)));
+        tabs.forEach((key) => { $(`#view-${key}`).hidden = button.dataset.resultTab !== key; });
+      }));
+      $('#calculate-eri').addEventListener('click', calculateEri);
+      setTimeout(() => map.invalidateSize(), 220);
+    }
+    appendResultDownloads(response);
+  }
+
+  function appendResultDownloads(response) {
+    const body = $('#results-body');
+    if (!body || !response.result_id || body.querySelector('.result-download-actions')) return;
+    body.querySelectorAll('.download-link').forEach((link) => link.remove());
+    const id = encodeURIComponent(response.result_id);
+    body.insertAdjacentHTML('beforeend', `<div class="result-download-actions"><a class="btn btn-p" href="/api/v1/results/${id}/report.pdf">Generar informe técnico (PDF)</a><a class="btn btn-s" href="/api/v1/results/${id}/download.zip">Descargar datos y metadatos</a></div>`);
+  }
+
+  function structuralInterpretation(landscape = {}, network = {}) {
+    const patches = Number(landscape.numero_parches || 0);
+    const components = Number(network.numero_componentes || 0);
+    const isolated = Number(network.numero_parches_aislados || 0);
+    const mainShare = Number(network.porcentaje_nodos_componente_mayor || 0);
+    if (!patches) return 'La cobertura oficial no identificó parches forestales válidos dentro del área. Revise la cobertura, el recorte y los datos sin interpretar este resultado como ausencia comprobada de bosque.';
+    if (patches === 1) return 'La cobertura oficial forma un solo parche dentro del área. Esta lectura describe continuidad geométrica a la resolución del producto y no conectividad funcional para una especie.';
+    if (components <= 1) return `Los ${number(patches,0)} parches pertenecen a una sola red con el umbral elegido. La relación es estructural y depende de la distancia máxima configurada.`;
+    return `Los ${number(patches,0)} parches se distribuyen en ${number(components,0)} componentes; ${number(isolated,0)} están aislados y la red principal reúne ${number(mainShare,1)} % de los parches. Conviene revisar las separaciones sin asumir movimiento de fauna.`;
+  }
+
+  function patchDistributionRows(result = {}) {
+    const features = result.parches_geojson?.features || [];
+    const bins = [
+      {label:'< 1 ha', min:0, max:1, value:0, color:'#9ccf7c'},
+      {label:'1–5 ha', min:1, max:5, value:0, color:'#62a95c'},
+      {label:'5–25 ha', min:5, max:25, value:0, color:'#31834d'},
+      {label:'≥ 25 ha', min:25, max:Infinity, value:0, color:'#176b45'},
+    ];
+    features.forEach((feature) => {
+      const props = feature.properties || {};
+      const area = Number(props.area_ha ?? props.superficie_ha ?? props.area ?? NaN);
+      if (!Number.isFinite(area)) return;
+      const bin = bins.find((item) => area >= item.min && area < item.max);
+      if (bin) bin.value += 1;
+    });
+    return bins.map((item) => ({...item, formatted:`${number(item.value,0)} parches`}));
+  }
+
+  function structuralCharts(result = {}, includeNetwork = true) {
+    const landscape = result.metricas_clase || {};
+    const network = result.metricas_red || {};
+    const sizeRows = patchDistributionRows(result);
+    const charts = [];
+    if (sizeRows.some((row) => row.value > 0)) {
+      charts.push(`<div class="chart-card"><h3>Distribución de tamaños de parche</h3>${barChart(sizeRows)}<p class="chart-note">Conteo de los parches transferidos con el resultado. Si la API generaliza o limita geometrías, consulte la descarga para el detalle completo.</p></div>`);
+    }
+    if (includeNetwork) {
+      const total = Number(landscape.numero_parches || 0);
+      const isolated = Math.min(total, Number(network.numero_parches_aislados || 0));
+      const connected = Math.max(0, total - isolated);
+      charts.push(`<div class="chart-card"><h3>Condición de los parches al umbral elegido</h3>${barChart([
+        {label:'En red',value:connected,formatted:`${number(connected,0)} parches`,color:'#225ea8'},
+        {label:'Aislados',value:isolated,formatted:`${number(isolated,0)} parches`,color:'#d0442c'},
+      ])}<p class="chart-note">El aislamiento depende del umbral de ${number(network.umbral_m || 0,0)} m entre bordes.</p></div>`);
+    }
+    return charts.join('');
+  }
+
+  function prepareResultArea(response) {
+    if (state.areaLayer) map.removeLayer(state.areaLayer);
+    state.areaLayer = L.geoJSON(response.area.geometry, {style:layerStyle('area')}).addTo(map);
+    const bounds = state.areaLayer.getBounds();
+    const fitSelectedArea = () => {
+      if (!bounds.isValid()) return;
+      map.invalidateSize({pan:false});
+      map.fitBounds(bounds, {padding:[35,35],maxZoom:14,animate:false});
+    };
+    fitSelectedArea();
+    // El panel derecho cambia de tamaño al montar los resultados. Leaflet debe
+    // recalcular su lienzo después de ese cambio para conservar el encuadre del
+    // territorio seleccionado al restaurar un resultado desde la URL.
+    window.setTimeout(fitSelectedArea, 320);
+  }
+
+  function renderEcologicalEvaluation(response) {
+    clearResultLayers();
+    const result = response.result;
+    addTileResultLayer('ecologicalCoincidence', 'Sectores que requieren revisión', result.maps?.coincidence, true);
+    addTileResultLayer('ecologicalJrc', 'Estado forestal JRC TMF 2025', result.maps?.jrc_state, false);
+    const structure = result.structural_reference_2021;
+    if (structure) {
+      addResultLayer('structuralPatches', 'Parches oficiales 2021', structure.parches_geojson, '#237A4B', false);
+      addResultLayer('structuralConnections', 'Conexiones modeladas 2021', structure.conexiones_geojson, '#225ea8', false);
+      addResultLayer('structuralGaps', 'Brechas potenciales 2021', structure.conexiones_potenciales_geojson, '#d0442c', false);
+      addResultLayer('structuralRoute', 'Ruta potencial hacia corredor', structure.ruta_corredor_geojson, '#f28e2b', false);
+    }
+    prepareResultArea(response);
+    const labels = {tmf:'JRC TMF',hansen:'Hansen GFC',esri:'ESRI LULC',gedi:'GEDI',ndvi:'Sentinel-2 NDVI'};
+    const colors = {tmf:'#005a32',hansen:'#d62828',esri:'#3a7ca5',gedi:'#7a5195',ndvi:'#e9a23b'};
+    const signalRows = Object.entries(result.signals).map(([key,active]) => ({label:labels[key],value:active ? result.contributions[key] : 0,formatted:active ? `Activa · +${number(result.contributions[key],1)}` : 'Sin señal',color:active ? colors[key] : '#c9d2df'}));
+    const metrics = result.metrics;
+    const signalCards = Object.entries(result.signals).map(([key,active]) => metric(labels[key], active ? 'Señal activa' : 'Sin señal', `${number(result.contributions[key],1)} de ${number(result.weights[key],1)} puntos`)).join('');
+    const priorityColor = {Alta:'#b42318',Media:'#e9a23b',Preventiva:'#3a7ca5',Baja:'#1f8a70'}[result.priority] || '#0a4393';
+    $('#results-title').textContent = 'Preevaluación territorial';
+    $('#results-subtitle').textContent = `${response.area.label} · diagnóstico multifuente`;
+    const summaryView = `<div class="priority-banner" style="border-left-color:${priorityColor}"><span>Prioridad territorial</span><b>${esc(result.priority)}</b><small>${number(result.score,1)} de ${number(result.maximum_score,1)} puntos</small></div><div class="metric-grid">${metric('Prioridad de visita',result.visit_priority.prioridad_visita || result.visit_priority.prioridad || '—',result.visit_priority.combinacion_territorial || '')}${metric('Consistencia de fuentes',result.consistency.nivel || '—',(result.consistency.fuentes_deterioro || []).join(', '))}</div><div class="interpretation"><b>Lectura integrada.</b> ${esc(result.visit_priority.lectura_integrada || result.consistency.detalle || '')}</div>`;
+    const forestView = `<div class="metric-grid">${metric('Deforestación JRC',hectares(metrics.tmf_deforestacion),'2025')}${metric('Degradación JRC',hectares(metrics.tmf_degradacion),'2025')}${metric('Regeneración JRC',hectares(metrics.tmf_recuperacion),'2025')}${metric('Pérdida Hansen',hectares(metrics.hansen_post),'posterior a 2020')}</div><div class="chart-card"><h3>Aportes reales al índice de indicios</h3>${barChart(signalRows)}<p class="chart-note">Las barras representan aportes al índice, no categorías mutuamente excluyentes de superficie.</p></div><div class="res-sec"><h3>Señales por fuente</h3><div class="metric-grid">${signalCards}</div></div>`;
+    const connectivityView = structure ? `<div class="metric-grid">${metric('Bosque oficial 2021',hectares(structure.metricas_clase.area_total_bosque_ha),`${number(structure.metricas_clase.porcentaje_paisaje_bosque,1)} % del territorio`)}${metric('Parches',number(structure.metricas_clase.numero_parches,0),`${number(structure.metricas_clase.area_media_parche_ha,2)} ha de media`)}${metric('Componentes',number(structure.metricas_red.numero_componentes,0),`${number(structure.metricas_red.numero_parches_aislados,0)} aislados`)}${metric('Conexiones',number(structure.metricas_red.numero_aristas,0),`umbral ${number(structure.metricas_red.umbral_m,0)} m`)}</div>${structuralCharts(structure,true)}<div class="interpretation"><b>Qué significa.</b> ${esc(structuralInterpretation(structure.metricas_clase,structure.metricas_red))}</div>` : `<div class="empty-result"><h3>No calculado</h3><p>La preevaluación territorial ya está disponible. Para preparar parches y red seleccione Fragmentación, Conectividad o Análisis integral.</p><button class="btn btn-p" type="button" data-open-analysis>Completar análisis estructural</button></div>`;
+    const coverageView = `<div class="empty-result"><h3>Coberturas oficiales disponibles</h3><p>Active en el panel izquierdo la cartografía SINIA/MiAMBIENTE que desea explorar. Las capas se muestran sin recalcular este resultado y conservan sus leyendas y años reales.</p></div>`;
+    const reportView = `<div class="res-sec"><h3>Limitaciones y verificación</h3><ul class="warning-list">${response.warnings.map(item => `<li>${esc(item)}</li>`).join('')}</ul></div><div id="eri-content" class="empty-result"><h3>ERI complementario</h3><p>Se calcula por separado y no altera el índice de indicios.</p><button class="btn btn-s" id="calculate-eri" type="button">Calcular ERI complementario</button></div>`;
+    mountScientificViews({summary:summaryView,forest:forestView,connectivity:connectivityView,corridors:corridorResultView(response),coverages:coverageView,report:reportView});
+    $('#calculate-eri')?.addEventListener('click', calculateEri);
+    renderLayers(); renderLegend(); setTimeout(() => map.invalidateSize(),220);
+  }
+
+  function renderIntegratedEvaluation(response) {
+    const evaluation = response.result.evaluation;
+    const structure = response.result.structure;
+    const selected = response.result.selected_components || ['ecological','fragmentation','connectivity'];
+    const showFragmentation = selected.includes('fragmentation');
+    const showConnectivity = selected.includes('connectivity');
+    renderEcologicalEvaluation({...response, result:evaluation});
+    addResultLayer('structuralPatches', 'Parches oficiales 2021', structure.parches_geojson, '#237A4B', showFragmentation || showConnectivity);
+    if (showConnectivity) {
+      addResultLayer('structuralConnections', 'Conexiones modeladas 2021', structure.conexiones_geojson, '#225ea8', true);
+      addResultLayer('structuralGaps', 'Brechas potenciales 2021', structure.conexiones_potenciales_geojson, '#d0442c', false);
+      addResultLayer('structuralRoute', 'Ruta potencial hacia corredor', structure.ruta_corredor_geojson, '#f28e2b', true);
+    }
+    const landscape = structure.metricas_clase || {};
+    const network = structure.metricas_red || {};
+    $('#results-title').textContent = selected.length === 3 ? 'Análisis integral' : 'Análisis combinado';
+    $('#results-subtitle').textContent = `${response.area.label} · señales y estructura oficial 2021`;
+    const fragmentationCards = showFragmentation ? `${metric('Bosque oficial 2021',hectares(landscape.area_total_bosque_ha || 0),`${number(landscape.porcentaje_paisaje_bosque || 0,1)} % del área`)}${metric('Parches',number(landscape.numero_parches || 0,0),`${number(landscape.area_media_parche_ha || 0,2)} ha de media`)}${metric('Densidad',number(landscape.densidad_parches_por_100ha || 0,2),'parches / 100 ha')}` : '';
+    const connectivityCards = showConnectivity ? `${metric('Componentes',number(network.numero_componentes || 0,0),`${number(network.numero_parches_aislados || 0,0)} aislados`)}${metric('Conexiones',number(network.numero_aristas || 0,0),`umbral ${number(network.umbral_m || 0,0)} m`)}${metric('Brechas',number(network.numero_brechas_potenciales || 0,0),'potenciales')}${metric('Ruta a corredor',structure.conexion_corredor?.conecta ? 'Identificada' : 'No identificada',structure.conexion_corredor?.corredor_nombre || '')}` : '';
+    const connectivityView = $('#view-connectivity');
+    if (connectivityView) connectivityView.innerHTML = `<div class="res-sec"><h3>${showFragmentation && showConnectivity ? 'Fragmentación y conectividad' : showFragmentation ? 'Fragmentación' : 'Conectividad'}</h3><div class="metric-grid">${fragmentationCards}${connectivityCards}</div>${structuralCharts(structure, showConnectivity)}<div class="interpretation"><b>Qué significa.</b> ${esc(structuralInterpretation(landscape, network))}</div><p class="method-note">Los indicadores estructurales complementan la prioridad territorial; no suman puntos ni demuestran movimiento de fauna.</p></div>`;
+    renderLayers(); renderLegend();
+  }
+
+  function renderOfficialCoverage(response) {
+    clearResultLayers();
+    const result = response.result;
+    const year = result.year;
+    addTileResultLayer(`officialCoverage${year}`, `Cobertura ${year} · categorías`, result.map, true);
+    prepareResultArea(response);
+    const rows = result.statistics.classes || [];
+    const validArea = result.statistics.valid_area_ha ?? result.statistics.total_classified_ha;
+    const validPct = result.statistics.valid_coverage_pct ?? (result.statistics.aoi_area_ha ? validArea / result.statistics.aoi_area_ha * 100 : 0);
+    $('#results-title').textContent = year === 2021 ? 'Cobertura institucional 2021' : 'Cobertura diagnóstica 2023';
+    $('#results-subtitle').textContent = `${response.area.label} · categorías amplias de Panamá`;
+    const summaryView = `<div class="review-note"><b>${esc(result.source)}.</b> La leyenda conserva exactamente las categorías disponibles; no se desagrega «Otras Tierras» en usos que el producto no identifica.</div><div class="metric-grid">${metric('Área del AOI',hectares(result.statistics.aoi_area_ha),'denominador territorial')}${metric('Área clasificada',hectares(validArea),`${number(validPct,1)} % del AOI`)}${metric('Sin clasificar',hectares(result.statistics.unclassified_or_nodata_ha),'fuera del denominador por categorías')}</div>`;
+    const coverageView = `<div class="chart-card"><h3>Superficie por categoría</h3>${barChart(rows.map((row,index) => ({label:row.label,value:row.area_ha,formatted:hectares(row.area_ha),color:result.map.classes[index]?.color || '#3a7ca5'})))}</div><div class="metric-grid">${rows.map(row => metric(row.label,hectares(row.area_ha),`${number(row.percentage,1)} % del área clasificada`)).join('')}</div>`;
+    const reportView = `<div class="res-sec"><h3>Uso permitido y límites</h3><ul class="warning-list">${result.prohibited_interpretations.map(item => `<li>${esc(item)}</li>`).join('')}</ul></div>`;
+    mountScientificViews({summary:summaryView,coverages:coverageView,corridors:corridorResultView(response),report:reportView},'coverages');
+    renderLayers(); renderLegend(); setTimeout(() => map.invalidateSize(),220);
+  }
+
+  function renderStructuralConnectivity(response, scope = 'connectivity') {
+    clearResultLayers();
+    const result = response.result;
+    const year = result.reference_year;
+    addResultLayer('structuralPatches', `Parches ${year}`, result.parches_geojson, '#237A4B', true);
+    addResultLayer('structuralConnections', `Conexiones modeladas ${year}`, result.conexiones_geojson, '#225ea8', scope === 'connectivity');
+    addResultLayer('structuralGaps', `Brechas potenciales ${year}`, result.conexiones_potenciales_geojson, '#d0442c', false);
+    addResultLayer('structuralRoute', 'Ruta potencial hacia corredor', result.ruta_corredor_geojson, '#f28e2b', scope === 'connectivity');
+    prepareResultArea(response);
+    const landscape = result.metricas_clase || {};
+    const network = result.metricas_red || {};
+    $('#results-title').textContent = scope === 'fragmentation' ? 'Fragmentación oficial 2021' : result.scenario === 'official_2021' ? 'Conectividad oficial 2021' : 'Conectividad diagnóstica 2023';
+    $('#results-subtitle').textContent = `${response.area.label} · ${result.authority}`;
+    const fragmentationCards = `${metric('Bosque/tierras boscosas',hectares(landscape.area_total_bosque_ha || 0),`${number(landscape.porcentaje_paisaje_bosque || 0,1)} % del AOI`)}${metric('Parches',number(landscape.numero_parches || 0,0),`${number(landscape.area_media_parche_ha || 0,2)} ha de media`)}${metric('Densidad',number(landscape.densidad_parches_por_100ha || 0,2),'parches / 100 ha')}${metric('Densidad de borde',number(landscape.densidad_borde_m_ha || 0,2),'m / ha')}`;
+    const connectivityCards = `${metric('Componentes',number(network.numero_componentes || 0,0),`${number(network.numero_parches_aislados || 0,0)} parches aislados`)}${metric('Conexiones',number(network.numero_aristas || 0,0),`umbral ${number(network.umbral_m || 0,0)} m`)}${metric('Brechas potenciales',number(network.numero_brechas_potenciales || 0,0),'separaciones para revisar')}${metric('Contexto exterior',`${number(result.context_radius_m || 0,0)} m`,'no suma superficie al AOI')}`;
+    const summaryView = `<div class="metric-grid">${fragmentationCards}${scope === 'connectivity' ? connectivityCards : ''}</div><div class="interpretation"><b>Qué significa.</b> ${esc(structuralInterpretation(landscape, network))}</div>`;
+    const connectivityView = `${structuralCharts(result, scope === 'connectivity')}<div class="interpretation technical"><b>Método.</b> ${esc(result.source_adaptation)} ${scope === 'connectivity' ? esc(result.metodo) : 'Los parches se delimitan sobre la cobertura oficial y las superficies se recortan al área objetivo.'}</div>`;
+    const reportView = `<div class="res-sec"><h3>Advertencias científicas</h3><ul class="warning-list">${response.warnings.map(item => `<li>${esc(item)}</li>`).join('')}</ul></div>`;
+    mountScientificViews({summary:summaryView,connectivity:connectivityView,corridors:corridorResultView(response),report:reportView},'connectivity');
+    renderLayers(); renderLegend(); setTimeout(() => map.invalidateSize(),220);
+  }
+
+  function renderStructuralComparison(response) {
+    clearResultLayers();
+    const scenarios = response.result.scenarios || {};
+    const reference = scenarios['2021'] || {};
+    const diagnostic = scenarios['2023'] || {};
+    addResultLayer('comparisonPatches2021', 'Parches estructurales 2021', reference.parches_geojson, '#237A4B', true);
+    addResultLayer('comparisonPatches2023', 'Parches diagnósticos 2023', diagnostic.parches_geojson, '#7a5195', false);
+    addResultLayer('comparisonConnections2021', 'Conexiones estructurales modeladas 2021', reference.conexiones_geojson, '#225ea8', false);
+    addResultLayer('comparisonConnections2023', 'Conexiones estructurales modeladas 2023', diagnostic.conexiones_geojson, '#f28e2b', false);
+    addResultLayer('comparisonRoute2021', 'Ruta potencial 2021', reference.ruta_corredor_geojson, '#0a4393', false);
+    addResultLayer('comparisonRoute2023', 'Ruta potencial 2023', diagnostic.ruta_corredor_geojson, '#d0442c', false);
+    prepareResultArea(response);
+
+    const landscape21 = reference.metricas_clase || {};
+    const landscape23 = diagnostic.metricas_clase || {};
+    const network21 = reference.metricas_red || {};
+    const network23 = diagnostic.metricas_red || {};
+    $('#results-title').textContent = 'Escenarios estructurales 2021 y 2023';
+    $('#results-subtitle').textContent = `${response.area.label} · diagnósticos paralelos con parámetros equivalentes`;
+    const summaryView = `<div class="review-note"><b>Comparación exploratoria.</b> ${esc(response.result.interpretation)}</div><div class="metric-grid">${metric('Bosque 2021',hectares(landscape21.area_total_bosque_ha || 0),`${number(landscape21.porcentaje_paisaje_bosque || 0,1)} % del AOI`)}${metric('Bosque 2023',hectares(landscape23.area_total_bosque_ha || 0),`${number(landscape23.porcentaje_paisaje_bosque || 0,1)} % del AOI`)}${metric('Parches 2021',number(landscape21.numero_parches || 0,0),`${number(landscape21.area_media_parche_ha || 0,2)} ha de media`)}${metric('Parches 2023',number(landscape23.numero_parches || 0,0),`${number(landscape23.area_media_parche_ha || 0,2)} ha de media`)}</div><div class="interpretation"><b>Lectura permitida.</b> Los valores describen la estructura que produce cada cartografía con el mismo umbral. No se publica diferencia de pérdida o ganancia porque la equivalencia temática y geométrica no ha sido demostrada.</div>`;
+    const comparisonCharts = `<div class="chart-card"><h3>Superficie forestal por escenario</h3>${barChart([{label:'Referencia 2021',value:landscape21.area_total_bosque_ha,formatted:hectares(landscape21.area_total_bosque_ha || 0),color:'#237A4B'},{label:'Diagnóstico 2023',value:landscape23.area_total_bosque_ha,formatted:hectares(landscape23.area_total_bosque_ha || 0),color:'#7a5195'}])}<p class="chart-note">Barras paralelas; no representan pérdida o ganancia.</p></div><div class="chart-card"><h3>Número de parches</h3>${barChart([{label:'2021',value:landscape21.numero_parches,formatted:`${number(landscape21.numero_parches || 0,0)} parches`,color:'#237A4B'},{label:'2023',value:landscape23.numero_parches,formatted:`${number(landscape23.numero_parches || 0,0)} parches`,color:'#7a5195'}])}</div><div class="chart-card"><h3>Componentes de red</h3>${barChart([{label:'2021',value:network21.numero_componentes,formatted:number(network21.numero_componentes || 0,0),color:'#225ea8'},{label:'2023',value:network23.numero_componentes,formatted:number(network23.numero_componentes || 0,0),color:'#f28e2b'}])}</div><div class="chart-card"><h3>Conexiones modeladas</h3>${barChart([{label:'2021',value:network21.numero_aristas,formatted:number(network21.numero_aristas || 0,0),color:'#225ea8'},{label:'2023',value:network23.numero_aristas,formatted:number(network23.numero_aristas || 0,0),color:'#f28e2b'}])}<p class="chart-note">Umbral común: ${number(response.result.parameters?.maximum_distance_m || 0,0)} m.</p></div>`;
+    const connectivityView = `<div class="metric-grid">${metric('Componentes 2021',number(network21.numero_componentes || 0,0),`${number(network21.numero_parches_aislados || 0,0)} aislados`)}${metric('Componentes 2023',number(network23.numero_componentes || 0,0),`${number(network23.numero_parches_aislados || 0,0)} aislados`)}${metric('Conexiones 2021',number(network21.numero_aristas || 0,0),'relaciones estructurales')}${metric('Conexiones 2023',number(network23.numero_aristas || 0,0),'relaciones estructurales')}</div>${comparisonCharts}<div class="interpretation technical"><b>Fuentes.</b> 2021 usa el vector institucional filtrado por categoría; 2023 usa la clase 1 del ráster diagnóstico a 10 m con vecindad de ocho píxeles.</div>`;
+    const reportView = `<div class="res-sec"><h3>Advertencias científicas</h3><ul class="warning-list">${response.warnings.map(item => `<li>${esc(item)}</li>`).join('')}</ul></div>`;
+    mountScientificViews({summary:summaryView,connectivity:connectivityView,corridors:corridorResultView(response),report:reportView},'connectivity');
+    renderLayers(); renderLegend(); setTimeout(() => map.invalidateSize(),220);
   }
 
   async function calculateEri() {
@@ -674,9 +1136,32 @@
     }
   }
 
-  $('#results-close').addEventListener('click', () => { $('#results-panel').classList.add('closed'); $('#results-reopen').hidden = false; setTimeout(() => map.invalidateSize(), 220); });
+  $('#results-close').addEventListener('click', () => { window.location.assign('/methodology'); });
   $('#results-reopen').addEventListener('click', () => { $('#results-panel').classList.remove('closed'); $('#results-reopen').hidden = true; setTimeout(() => map.invalidateSize(), 220); });
   $('#download-result').addEventListener('click', () => { if (state.result) window.location.assign(`/api/v1/results/${state.result.result_id}/download.zip`); });
+  $('#results-body').addEventListener('click', (event) => {
+    if (event.target.closest('[data-open-analysis]')) $('#open-analysis').click();
+  });
+  $('#reset-platform').addEventListener('click', () => {
+    clearResultLayers();
+    if (state.areaLayer) { map.removeLayer(state.areaLayer); state.areaLayer = null; }
+    state.result = null;
+    state.lastAnalysisFingerprint = null;
+    state.eri = null;
+    state.drawnGeometry = null;
+    state.territoryId = null;
+    state.wizard = {...state.wizard,selectedComponents:['ecological'],areaMode:'draw',subbasin:'',source:'jrc_tmf',initialYear:2020,finalYear:2025,maximumDistance:500,minimumPatchArea:0};
+    localStorage.removeItem('chcp.portal-state.v1');
+    $('#results-title').textContent = 'Territorio preparado';
+    $('#results-subtitle').textContent = 'Los resultados reales aparecerán aquí sin ocultar el mapa.';
+    $('#results-navigation').hidden = true;
+    $('#results-navigation').innerHTML = '';
+    $('#results-body').innerHTML = '<div class="empty-result scientific-empty"><h3>No calculado</h3><p>Seleccione el área y ejecute una preevaluación, fragmentación, conectividad o análisis integral. Las capas de exploración pueden activarse sin recalcular.</p><button class="btn btn-p" type="button" data-open-analysis>Realizar análisis</button></div>';
+    $('#download-result').disabled = true;
+    renderQuickFilters(); renderLayers(); renderLegend(); updateAreaLabel();
+    if (basinLayer) { basinLayer.addTo(map); map.fitBounds(basinLayer.getBounds(),{padding:[18,18]}); }
+    toast('La vista cartográfica fue restablecida.');
+  });
   $('#left-toggle').addEventListener('click', () => {
     const container = $('#v-plataforma');
     const collapsed = container.classList.toggle('left-collapsed');
@@ -689,6 +1174,23 @@
     $$('.side-tabs [role="tab"]').forEach((item) => item.setAttribute('aria-selected', String(item === button)));
     ['layers','filters','basemaps'].forEach((key) => { $(`#panel-${key}`).hidden = button.dataset.panel !== key; });
   }));
+
+  function renderPreparedTerritory(summary) {
+    if (state.result) return;
+    const territory = summary.territory || {};
+    const corridors = summary.corridors || {};
+    const navigation = $('#results-navigation');
+    navigation.hidden = true;
+    navigation.innerHTML = '';
+    $('#results-title').textContent = territory.nombre || 'Territorio preparado';
+    $('#results-subtitle').textContent = `${territory.tipo === 'subcuenca' ? 'Subcuenca de la CHCP' : territory.grupo || 'Contexto territorial'} · listo para explorar`;
+    $('#results-body').innerHTML = `<section class="result-view scientific-result-view prepared-territory">
+      <div class="prepared-status"><span>Territorio seleccionado</span><b>${esc(territory.nombre || 'Área preparada')}</b><small>El mapa y las capas exploratorias están disponibles sin ejecutar Earth Engine.</small></div>
+      <div class="metric-grid">${metric('Superficie territorial',hectares(summary.area_ha || 0),'calculada localmente')}${metric('Corredores intersectados',number(corridors.count || 0,0),(corridors.names || []).join(', ') || 'contexto publicado')}${metric('Puntos críticos',number(summary.critical_points || 0,0),'publicados dentro del territorio')}${metric('Indicadores científicos','No calculados','requieren una ruta de análisis')}</div>
+      <div class="interpretation technical"><b>Qué puede hacer ahora.</b> Active coberturas, corredores o NDVI desde el panel izquierdo para explorar el territorio. Use «Realizar análisis» únicamente cuando necesite indicadores científicos nuevos.</div>
+      <button class="btn btn-p" type="button" data-open-analysis>Realizar análisis</button>
+    </section>`;
+  }
 
   async function applyPreparedTerritory() {
     const params = new URLSearchParams(window.location.search);
@@ -714,6 +1216,7 @@
         state.areaLayer = L.geoJSON(summary.geometry, {style: layerStyle('area')}).addTo(map);
         map.fitBounds(state.areaLayer.getBounds(), {padding:[35,35],maxZoom:13});
         updateAreaLabel();
+        renderPreparedTerritory(summary);
       } catch (error) {
         toast(`No se pudo preparar el territorio guardado: ${error.message}`, 'error');
       }

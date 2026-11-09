@@ -55,7 +55,7 @@ cálculos interactivos de lectura implementados.
 
 Los assets privados se autorizan en su propio control de acceso, solo en lectura:
 
-- `EE_ASSET_BOSQUE_2021`: compartir con la cuenta de ejecución si se incorpora al
+- `SINIA_2021_FOREST_ASSET` (por defecto `projects/geoportal-513817/assets/SINIA_2021_COBERTURA_GENERAL_VECTOR`): compartir con la cuenta de ejecución para
   servicio web o si también se publica la aplicación Streamlit.
 - `EE_ASSET_FINCAS`: legado opcional; la interfaz pública no ofrece fincas y no debe
   migrarse salvo decisión expresa.
@@ -191,8 +191,9 @@ costos; no forma parte de la primera prueba privada.
 - La caché y el limitador viven en memoria y no se comparten entre instancias. Un
   reinicio elimina resultados y descargas. No son apropiados para ejecución pública
   masiva.
-- Cuatro resultados vectoriales grandes pueden presionar 2 GiB. Medir memoria real;
-  reducir `WEB_RESULT_CACHE_ENTRIES` a 2 o aumentar memoria antes de ampliar usuarios.
+- La configuración conserva hasta seis resultados durante una hora para evitar
+  recálculos inmediatos. Los resultados vectoriales grandes pueden presionar 2 GiB:
+  medir memoria real y reducir `WEB_RESULT_CACHE_ENTRIES` antes de ampliar usuarios.
 - `maxScale=2` y un análisis por instancia permiten, como máximo práctico, dos
   cálculos simultáneos del servicio, aunque cada instancia pueda servir otras
   solicitudes livianas.

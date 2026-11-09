@@ -8,8 +8,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     WEB_MAX_COORDINATES=5000 \
     WEB_MAX_ANALYSIS_AREA_HA=345000 \
     WEB_MAX_MAP_FEATURES=1500 \
-    WEB_RESULT_CACHE_ENTRIES=4 \
-    WEB_RESULT_CACHE_TTL=900 \
+    WEB_RESULT_CACHE_ENTRIES=6 \
+    WEB_RESULT_CACHE_TTL=3600 \
     WEB_MAX_CONCURRENT_ANALYSES=1 \
     WEB_ANALYSIS_RATE_LIMIT=4 \
     WEB_DOWNLOAD_RATE_LIMIT=20 \
@@ -18,8 +18,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-web.txt ./
+RUN pip install --no-cache-dir -r requirements-web.txt
 
 RUN addgroup --system --gid 10001 app && \
     adduser --system --uid 10001 --ingroup app --home /app app

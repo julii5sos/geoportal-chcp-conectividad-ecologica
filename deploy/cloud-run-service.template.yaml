@@ -32,9 +32,9 @@ spec:
             - name: WEB_MAX_MAP_FEATURES
               value: "1500"
             - name: WEB_RESULT_CACHE_ENTRIES
-              value: "4"
+              value: "6"
             - name: WEB_RESULT_CACHE_TTL
-              value: "900"
+              value: "3600"
             - name: WEB_MAX_CONCURRENT_ANALYSES
               value: "1"
             - name: WEB_ANALYSIS_RATE_LIMIT

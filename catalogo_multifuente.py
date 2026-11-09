@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
+from catalogo_assets_sinia import ASSETS_SINIA
+
 
 ESTADOS = (
     "Integrada y operativa",
@@ -126,11 +128,11 @@ FUENTES_TRAZABILIDAD: dict[str, FuenteTrazable] = {
     ),
     "sinia_2021": FuenteTrazable(
         "sinia_2021", "SINIA–MiAMBIENTE · Bosque y otros usos", "Referencia 2021",
-        "EE_ASSET_BOSQUE_2021", "2021", "Vector institucional", "Según asset institucional",
+        str(ASSETS_SINIA["2021_general"]["asset_id"]), "2021", "Vector institucional", "Según asset institucional",
         "Bosques y otras tierras boscosas según la cartografía oficial aportada.",
-        "Fragmentación y conectividad institucional de referencia.", "C · histórica/territorial", ("Streamlit conectividad",),
-        "Pendiente de permisos o migración", "Pendiente de permisos o migración", "Asset privado no incluido en Git", True,
-        "No es directamente equivalente a JRC o ESRI.", "Compartir/migrar asset con lectura para la identidad de despliegue.",
+        "Fragmentación, conectividad y superficies institucionales de referencia.", "C · histórica/territorial", ("Flask/API", "fragmentación", "conectividad"),
+        "Integrada y operativa", "Integrada y operativa", "Asset privado disponible en geoportal-513817", True,
+        "No es directamente equivalente a JRC, ESRI ni al diagnóstico 2023.", "Mantener acceso de lectura para la identidad de despliegue.",
     ),
     "sinia_1992_2000": FuenteTrazable(
         "sinia_1992_2000", "SINIA–MiAMBIENTE · coberturas históricas 1992 y 2000", "Por validar",

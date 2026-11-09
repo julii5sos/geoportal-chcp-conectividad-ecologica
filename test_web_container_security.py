@@ -13,6 +13,19 @@ class WebContainerSecurityTests(unittest.TestCase):
         self.assertIn("--timeout ${WEB_WORKER_TIMEOUT:-540}", dockerfile)
         self.assertNotIn("GEE_SERVICE_ACCOUNT_JSON=", dockerfile)
         self.assertNotIn("GOOGLE_APPLICATION_CREDENTIALS=", dockerfile)
+        self.assertIn("requirements-web.txt", dockerfile)
+        self.assertNotIn("requirements.txt ./", dockerfile)
+
+    def test_flask_container_does_not_install_streamlit_stack(self):
+        requirements = "\n".join(
+            line for line in (ROOT / "requirements-web.txt").read_text(encoding="utf-8").lower().splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        )
+        self.assertIn("flask", requirements)
+        self.assertIn("earthengine-api", requirements)
+        self.assertIn("reportlab", requirements)
+        self.assertNotIn("streamlit", requirements)
+        self.assertNotIn("folium", requirements)
 
     def test_build_context_excludes_common_credentials_and_local_state(self):
         dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")

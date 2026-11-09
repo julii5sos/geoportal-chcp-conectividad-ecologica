@@ -4,8 +4,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="description" content="Geoportal CHCP 2.0 para preevaluación territorial y conectividad ecológica.">
-  <title>{% block title %}Geoportal CHCP 2.0{% endblock %}</title>
+  <meta name="description" content="Geoportal de Conectividad Ecológica de la Cuenca Hidrográfica del Canal de Panamá.">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <title>{% block title %}Geoportal de Conectividad Ecológica de la CHCP{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
   {% if use_map %}<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet.css') }}">{% endif %}
@@ -14,21 +15,29 @@
 </head>
 <body>
 <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
-<header class="nav">
+<header class="nav{% if app_page %} app-nav{% endif %}">
   <div class="nav-in">
-    <div class="util"><a href="{{ url_for('index') }}">Inicio</a><a href="{{ url_for('methodology') }}#sources">Atribución de datos</a><span>WGS 84 · EPSG:4326</span></div>
+    {% if not app_page %}<div class="util"><a href="{{ url_for('index') }}">Inicio</a><a href="{{ url_for('methodology') }}#sources">Atribución de datos</a><span>WGS 84 · EPSG:4326</span></div>{% endif %}
     <div class="main-row">
-      <a class="wm" href="{{ url_for('index') }}" aria-label="Inicio · Geoportal CHCP">{{ logo() }}<span><b>Geoportal CHCP</b><small>Conectividad ecológica</small></span></a>
+      <a class="wm" href="{{ url_for('index') }}" aria-label="Inicio · Geoportal de Conectividad Ecológica de la CHCP">{{ logo() }}<span><b>Geoportal CHCP</b><small>{% if app_page %}Análisis territorial y monitoreo de bosques{% else %}Conectividad ecológica{% endif %}</small></span></a>
       <nav class="links" id="links" aria-label="Secciones principales">
+        {% if app_page %}
+        <a href="{{ url_for('platform') }}"{% if active == 'platform' %} aria-current="page"{% endif %}>Análisis territorial</a>
+        <a href="{{ url_for('panel') }}"{% if active == 'panel' %} aria-current="page"{% endif %}>Monitoreo</a>
+        <a href="{{ url_for('platform') }}#results-body">Descargas</a>
+        <a href="{{ url_for('methodology') }}"{% if active == 'methodology' %} aria-current="page"{% endif %}>Documentación</a>
+        <a href="{{ url_for('about') }}"{% if active == 'about' %} aria-current="page"{% endif %}>Ayuda</a>
+        {% else %}
         <a href="{{ url_for('index') }}"{% if active == 'home' %} aria-current="page"{% endif %}>Conoce la herramienta</a>
         <a href="{{ url_for('panel') }}"{% if active == 'panel' %} aria-current="page"{% endif %}>Panel</a>
         <a href="{{ url_for('platform') }}"{% if active == 'platform' %} aria-current="page"{% endif %}>Plataforma</a>
+        <a href="{{ url_for('methodology') }}"{% if active == 'methodology' %} aria-current="page"{% endif %}>Metodología</a>
         <a href="{{ url_for('methodology') }}#sources"{% if active == 'methodology' %} aria-current="page"{% endif %}>Uso de datos</a>
         <a href="{{ url_for('about') }}"{% if active == 'about' %} aria-current="page"{% endif %}>Acerca</a>
+        {% endif %}
       </nav>
       <div class="nav-btns">
-        <a class="btn btn-w" href="{{ url_for('platform') }}">Explorar datos <span aria-hidden="true">↗</span></a>
-        <span class="btn btn-o" aria-label="Idioma español">ES</span>
+        {% if not app_page %}<a class="btn btn-w" href="{{ url_for('platform') }}">Explorar datos <span aria-hidden="true">↗</span></a><span class="btn btn-o" aria-label="Idioma español">ES</span>{% endif %}
         <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="links">Menú</button>
       </div>
     </div>

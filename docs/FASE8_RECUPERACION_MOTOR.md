@@ -15,7 +15,7 @@ interfaz HTML no considera integrada una fuente solo porque figure en el catálo
 | Sentinel-2 NDVI | mediana anual, SCL, respaldo del año anterior | `analisis_complementario.analizar_ndvi` | Implementado y verificado con EE | dos años y tres mapas |
 | GEDI/OpenForis | mosaico de `CanopyHeight_GEDI_V27` convertido a float | `analisis_complementario.analizar_gedi` | Implementado y verificado localmente | estadísticas y tesela real |
 | ESA WorldCover | no existía como cálculo original | referencia 2021 real | Implementado como evidencia, no como serie | histograma y tesela real |
-| SINIA 2021 | asset privado `EE_ASSET_BOSQUE_2021` | contrato y estado explícito | Pendiente de permisos/migración | no hay asset en Git |
+| SINIA 2021 | `SINIA_2021_COBERTURA_GENERAL_VECTOR` | contrato, estadísticas y motor estructural | Verificado localmente el 2026-11-07 | lectura de la cuenta de servicio pendiente antes del despliegue |
 | SINIA 1992/2000 | solo imágenes demostrativas | no se publica como resultado | Pendiente | faltan archivos, CRS y leyenda auditables |
 | FIRMS | no se encontró proceso original | bloqueado con mensaje explícito | Pendiente | falta consulta temporal validada |
 | GLAD/RADD | no se encontró ruta implementada | no disponible | Pendiente | falta proveedor/API/licencia verificada |

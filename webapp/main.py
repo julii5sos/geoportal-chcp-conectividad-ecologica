@@ -1,4 +1,4 @@
-"""Servidor Flask para la versión HTML del Geoportal CHCP 2.0."""
+"""Servidor Flask del Geoportal de Conectividad Ecológica de la CHCP."""
 
 from __future__ import annotations
 
@@ -13,18 +13,37 @@ from pydantic import ValidationError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from gee_config import resolver_proyecto_gee
+from catalogo_assets_sinia import catalogo_assets_sinia
 from territorio_local import nombres_subcuencas
-from webapp.models import AnalysisRequest, EriRequest, EvidenceRequest
+from webapp.models import (
+    AnalysisRequest,
+    EcologicalEvaluationRequest,
+    IntegratedEvaluationRequest,
+    EriRequest,
+    EvidenceRequest,
+    LayerPreviewRequest,
+    OfficialCoverageRequest,
+    StructuralComparisonRequest,
+    StructuralConnectivityRequest,
+)
 from webapp.security import ConcurrencyGate, SlidingWindowRateLimiter
 from webapp.service import (
     RequestLimitError,
     build_download,
+    build_technical_report,
     latest_result,
     public_cached_result,
     configuration,
     run_analysis,
+    run_ecological_evaluation,
+    run_integrated_evaluation,
+    run_layer_preview,
     run_evidence,
     run_eri,
+    run_official_coverage,
+    run_official_coverage_2021,
+    run_structural_comparison,
+    run_structural_connectivity,
     source_catalog,
     territory_payload,
 )
@@ -181,7 +200,7 @@ def create_app(*, testing: bool = False) -> Flask:
 
     @app.get("/methodology")
     def methodology():
-        return render_template("methodology.html", active="methodology")
+        return render_template("methodology.html", active="methodology", official_assets=catalogo_assets_sinia())
 
     @app.get("/about")
     def about():
@@ -191,7 +210,7 @@ def create_app(*, testing: bool = False) -> Flask:
     def health():
         return jsonify(
             status="ok",
-            application="Geoportal CHCP 2.0 HTML",
+            application="Geoportal de Conectividad Ecológica de la CHCP",
             project_id=resolver_proyecto_gee(),
             earth_engine="lazy",
         )
@@ -249,7 +268,11 @@ def create_app(*, testing: bool = False) -> Flask:
         except RequestLimitError as exc:
             return jsonify(error=str(exc), code="request_limit"), 413
         except ValueError as exc:
-            return jsonify(error=str(exc)), 400
+            app.logger.warning(
+                "Solicitud analítica rechazada: %s",
+                getattr(exc, "technical_detail", str(exc)),
+            )
+            return jsonify(error=getattr(exc, "public_message", str(exc))), 400
         except Exception:
             error_id = uuid.uuid4().hex[:10]
             app.logger.exception("Análisis web fallido [%s]", error_id)
@@ -257,6 +280,98 @@ def create_app(*, testing: bool = False) -> Flask:
                 error="No se pudo completar el análisis con Earth Engine.",
                 support_id=error_id,
             ), 502
+
+    def execute_guarded(model_type, operation, *, validation_message: str, failure_message: str):
+        if not request.is_json:
+            return jsonify(error="Se requiere Content-Type application/json."), 415
+        limited = check_rate_limit(analysis_limiter)
+        if limited is not None:
+            return limited
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(error="La solicitud debe contener un objeto JSON."), 400
+        try:
+            model = model_type.model_validate(payload)
+            if not analysis_gate.acquire():
+                response = jsonify(
+                    error="La instancia ya está procesando un análisis. Intente nuevamente.",
+                    code="busy",
+                )
+                response.status_code = 429
+                response.headers["Retry-After"] = "15"
+                return response
+            try:
+                return jsonify(operation(model))
+            finally:
+                analysis_gate.release()
+        except ValidationError as exc:
+            return jsonify(error=validation_message, details=_validation_details(exc)), 400
+        except RequestLimitError as exc:
+            return jsonify(error=str(exc), code="request_limit"), 413
+        except ValueError as exc:
+            app.logger.warning(
+                "Solicitud analítica rechazada: %s",
+                getattr(exc, "technical_detail", str(exc)),
+            )
+            return jsonify(error=getattr(exc, "public_message", str(exc))), 400
+        except Exception:
+            error_id = uuid.uuid4().hex[:10]
+            app.logger.exception("Solicitud analítica fallida [%s]", error_id)
+            return jsonify(error=failure_message, support_id=error_id), 502
+
+    @app.post("/api/v1/evaluations/ecological")
+    def api_ecological_evaluation():
+        return execute_guarded(
+            EcologicalEvaluationRequest,
+            run_ecological_evaluation,
+            validation_message="Revise el área de evaluación.",
+            failure_message="No se pudo completar la evaluación ecológica.",
+        )
+
+    @app.post("/api/v1/evaluations/integrated")
+    def api_integrated_evaluation():
+        return execute_guarded(
+            IntegratedEvaluationRequest,
+            run_integrated_evaluation,
+            validation_message="Revise el área y los parámetros estructurales.",
+            failure_message="No se pudo completar el análisis integral.",
+        )
+
+    @app.post("/api/v1/official-coverages/2023")
+    def api_official_coverage_2023():
+        return execute_guarded(
+            OfficialCoverageRequest,
+            run_official_coverage,
+            validation_message="Revise el área solicitada.",
+            failure_message="No se pudo consultar la cobertura oficial 2023.",
+        )
+
+    @app.post("/api/v1/official-coverages/2021")
+    def api_official_coverage_2021():
+        return execute_guarded(
+            OfficialCoverageRequest,
+            run_official_coverage_2021,
+            validation_message="Revise el área solicitada.",
+            failure_message="No se pudo consultar la cobertura oficial 2021.",
+        )
+
+    @app.post("/api/v1/structural-connectivity")
+    def api_structural_connectivity():
+        return execute_guarded(
+            StructuralConnectivityRequest,
+            run_structural_connectivity,
+            validation_message="Revise el área y los parámetros estructurales.",
+            failure_message="No se pudo completar la conectividad estructural.",
+        )
+
+    @app.post("/api/v1/structural-comparison")
+    def api_structural_comparison():
+        return execute_guarded(
+            StructuralComparisonRequest,
+            run_structural_comparison,
+            validation_message="Revise el área y los parámetros de comparación.",
+            failure_message="No se pudo completar la comparación estructural 2021–2023.",
+        )
 
     @app.post("/api/v1/eri")
     def api_eri():
@@ -322,6 +437,30 @@ def create_app(*, testing: bool = False) -> Flask:
             app.logger.exception("Evidencia multifuente fallida [%s]", error_id)
             return jsonify(error="No se pudo completar la evidencia solicitada.", support_id=error_id), 502
 
+    @app.post("/api/v1/layers/preview")
+    def api_layer_preview():
+        if not request.is_json:
+            return jsonify(error="Se requiere Content-Type application/json."), 415
+        limited = check_rate_limit(analysis_limiter)
+        if limited is not None:
+            return limited
+        try:
+            model = LayerPreviewRequest.model_validate(request.get_json(silent=True) or {})
+            if not analysis_gate.acquire():
+                return jsonify(error="La instancia ya está procesando una solicitud.", code="busy"), 429
+            try:
+                return jsonify(run_layer_preview(model))
+            finally:
+                analysis_gate.release()
+        except ValidationError as exc:
+            return jsonify(error="Revise los parámetros.", details=_validation_details(exc)), 400
+        except (RequestLimitError, ValueError) as exc:
+            return jsonify(error=str(exc)), 400
+        except Exception:
+            error_id = uuid.uuid4().hex[:10]
+            app.logger.exception("Vista previa cartográfica fallida [%s]", error_id)
+            return jsonify(error="No se pudo preparar la capa solicitada.", support_id=error_id), 502
+
     @app.get("/api/v1/results/<identifier>/download.zip")
     def api_download(identifier: str):
         limited = check_rate_limit(download_limiter)
@@ -337,6 +476,24 @@ def create_app(*, testing: bool = False) -> Flask:
             mimetype="application/zip",
             as_attachment=True,
             download_name=f"geoportal_chcp_{identifier[:8]}.zip",
+        )
+
+    @app.get("/api/v1/results/<identifier>/report.pdf")
+    def api_technical_report(identifier: str):
+        """Entrega el informe desde el resultado en caché, sin recalcular el análisis."""
+        limited = check_rate_limit(download_limiter)
+        if limited is not None:
+            return limited
+        content = build_technical_report(identifier)
+        if content is None:
+            return jsonify(error="El resultado no existe o expiró."), 404
+        from io import BytesIO
+
+        return send_file(
+            BytesIO(content),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"informe_tecnico_chcp_{identifier[:8]}.pdf",
         )
 
     @app.get("/api/v1/results/<identifier>")

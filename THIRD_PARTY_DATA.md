@@ -15,7 +15,19 @@ El raster continuo de conectividad de 6 km no se redistribuye en este repositori
 
 ## Cobertura bosque/no bosque
 
-La cobertura utilizada corresponde a la capa **Bosque y otros usos**, referencia 2021, publicada por SINIA–MiAMBIENTE. El repositorio no incluye el shapefile nacional `CBOTB_2021_25k`: la administración lo publica una sola vez como asset privado de Earth Engine. La aplicación selecciona automáticamente `Categoria = Bosques y Otras Tierras Boscosas` y recorta esos polígonos al área evaluada.
+La cobertura utilizada corresponde a la capa **Bosque y otros usos**, referencia 2021,
+publicada por SINIA–MiAMBIENTE. El repositorio no incluye el archivo nacional: la
+administración lo mantiene como el asset privado de Earth Engine
+`projects/geoportal-513817/assets/SINIA_2021_COBERTURA_GENERAL_VECTOR`. La aplicación
+selecciona automáticamente `Categoria = Bosques y Otras Tierras Boscosas` y recorta
+esos polígonos al área evaluada. La identidad local o de Cloud Run necesita permiso
+de lectura; los datos no se redistribuyen con el código.
+
+El diagnóstico 2023 utiliza el asset raster privado
+`projects/geoportal-513817/assets/SINIA_2023_COBERTURA_GENERAL_RASTER10M`. Su código 1
+se interpreta como bosques y otras tierras boscosas para un escenario estructural
+independiente. No se presenta como una serie homogénea con 2021 ni se utiliza para
+inferir transiciones sin una validación adicional de compatibilidad.
 
 ## Cuenca y subcuencas del Canal de Panamá
 

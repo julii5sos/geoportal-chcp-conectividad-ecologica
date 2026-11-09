@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from catalogo_assets_sinia import ASSETS_SINIA
+
 
 HANSEN_ASSET = "UMD/hansen/global_forest_change_2025_v1_13"
 SENTINEL_ASSET = "COPERNICUS/S2_SR_HARMONIZED"
@@ -98,6 +100,27 @@ def _ndvi(year: int, geometry, ee_module):
     return composite.normalizedDifference(["B8", "B4"]).rename("ndvi").toFloat().clip(geometry)
 
 
+def preparar_capa_ndvi(geojson: dict[str, Any], year: int, *, ee_module) -> dict[str, Any]:
+    """Prepara solo la tesela NDVI; no ejecuta estadísticas ni comparaciones."""
+    if year < 2017 or year > 2025:
+        raise ValueError("La vista NDVI admite años entre 2017 y 2025.")
+    geometry = ee_module.Geometry(geojson)
+    image = _ndvi(year, geometry, ee_module)
+    palette = ["8c510a", "d8b365", "f6e8c3", "c7eae5", "5ab4ac", "01665e"]
+    return {
+        "tile_url": _tile(image, {"min": -0.2, "max": 0.9, "palette": palette}),
+        "legend": f"NDVI Sentinel-2 · {year}",
+        "classes": [
+            {"value": "bajo", "etiqueta": "NDVI bajo", "color": "#8c510a"},
+            {"value": "medio", "etiqueta": "NDVI intermedio", "color": "#f6e8c3"},
+            {"value": "alto", "etiqueta": "NDVI alto", "color": "#01665e"},
+        ],
+        "year": year,
+        "source": "Sentinel-2 Surface Reflectance Harmonized",
+        "limitation": "Vista anual; no identifica por sí sola degradación, bosque maduro o restauración.",
+    }
+
+
 def analizar_ndvi(geojson: dict[str, Any], initial_year: int, final_year: int, *, ee_module) -> dict[str, Any]:
     if not 2017 <= initial_year < final_year <= 2026:
         raise ValueError("NDVI Sentinel-2 requiere dos años entre 2017 y 2026.")
@@ -179,8 +202,12 @@ def ejecutar_evidencia(source: str, geojson: dict[str, Any], initial_year: int |
         return analizar_gedi(geojson, ee_module=ee_module)
     if source == "worldcover":
         return analizar_worldcover(geojson, ee_module=ee_module)
-    if source == "sinia_2021" and not os.getenv("EE_ASSET_BOSQUE_2021"):
-        raise ValueError("SINIA 2021 no está configurado en este proyecto Earth Engine.")
+    if source == "sinia_2021":
+        raise ValueError(
+            "La cobertura SINIA 2021 se consulta desde el módulo de coberturas "
+            f"oficiales ({ASSETS_SINIA['2021_general']['asset_id']}); no es una "
+            "evidencia temporal complementaria y no está configurado como tal."
+        )
     if source == "firms":
         raise ValueError("FIRMS permanece pendiente de una consulta temporal validada; no se generan focos ficticios.")
     raise ValueError("La fuente solicitada no está configurada para procesamiento.")

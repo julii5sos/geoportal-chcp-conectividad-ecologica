@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% from "_macros.html" import hero %}
-{% block title %}Geoportal CHCP 2.0 · Conectividad ecológica{% endblock %}
+{% block title %}Geoportal de Conectividad Ecológica de la CHCP{% endblock %}
 {% block body %}
 <main>
-  {% call hero('Conectividad ecológica de la Cuenca del Canal de Panamá', 'Explore evidencia forestal, compare dos años y calcule fragmentación y conectividad estructural con fuentes verificables de Google Earth Engine.') %}
+  {% call hero('Geoportal de Conectividad Ecológica de la Cuenca Hidrográfica del Canal de Panamá', 'Una preevaluación reproducible para explorar señales territoriales, cobertura, fragmentación, corredores y conectividad estructural.') %}
     <div class="territory-search" id="territory-search">
       <label for="territory-query">Buscar cuenca o subcuenca</label>
       <div class="territory-search-box">
@@ -38,6 +38,7 @@
     <article class="card"><span class="date">03</span><h3>Conectividad</h3><p>Componentes, aislamiento y relaciones estructurales bajo un umbral común.</p></article>
     <article class="card"><span class="date">Complementario</span><h3>ERI</h3><p>Lectura independiente con los pesos originales; no altera las métricas temporales.</p></article>
   </div></div></section>
+  <section class="sec home-decisions"><div class="wrap"><div class="sec-c"><span class="eyebrow">Comience aquí</span><h2>Una entrada clara para cada necesidad</h2><p>La portada resume el propósito. Los detalles científicos y de datos quedan en sus secciones específicas.</p></div><div class="access-grid"><a href="{{ url_for('panel') }}"><span>01</span><b>Consultar el Panel</b><small>Resultados disponibles, gráficas, capas y contexto espacial.</small></a><a href="{{ url_for('platform') }}"><span>02</span><b>Crear un análisis</b><small>Dibuje o seleccione un territorio y configure el cálculo.</small></a><a href="{{ url_for('methodology') }}"><span>03</span><b>Revisar metodología y datos</b><small>Fuentes, períodos, leyendas, fórmulas y limitaciones.</small></a></div></div></section>
 </main>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}

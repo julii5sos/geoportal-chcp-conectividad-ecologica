@@ -340,3 +340,25 @@ El resultado se clasifica como muy bajo, bajo, medio, alto o muy alto y el visor
 identifica el componente con menor valor. La conectividad es un proxy espacial ligero:
 no equivale a ECA/A, no modela resistencia ni demuestra movimiento de fauna. Los pesos
 y las clases deben calibrarse con información de campo antes de cualquier uso normativo.
+
+## Comparación estructural 2021–2023
+
+El geoportal puede ejecutar dos diagnósticos con el mismo polígono, distancia máxima
+entre parches y superficie mínima de parche:
+
+- **2021:** cobertura vectorial institucional `SINIA_2021_COBERTURA_GENERAL_VECTOR`,
+  filtrada por `Categoria = Bosques y Otras Tierras Boscosas`;
+- **2023:** raster diagnóstico `SINIA_2023_COBERTURA_GENERAL_RASTER10M`, donde el
+  código 1 representa bosques y otras tierras boscosas, convertido a polígonos para
+  aplicar el mismo motor estructural.
+
+Cada escenario produce por separado superficie forestal, parches, bordes, componentes,
+aislamiento, conexiones y geometrías descargables. La interfaz y el PDF los presentan
+en columnas y mapas independientes. Se conservan sus fuentes y definiciones originales.
+
+Esta salida **no es una matriz de transición ni una estimación causal de cambio**. Los
+productos difieren en formato, resolución, proceso de clasificación y naturaleza de la
+fuente. Por ello el motor no calcula una diferencia científica de hectáreas ni afirma
+pérdida, ganancia o restauración entre 2021 y 2023. Una comparación temporal de cambio
+requiere demostrar compatibilidad temática, espacial y metodológica antes de habilitar
+esas operaciones.

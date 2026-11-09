@@ -4,6 +4,21 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
+## [6.0.0-rc.local] - 2026-11-08 — cierre local científico y comparación estructural
+
+- Añade una comparación explícita de los diagnósticos estructurales 2021 y 2023 con
+  parámetros equivalentes, capas, métricas, mapas y PDF separados.
+- Impide interpretar productos metodológicamente distintos como una transición causal:
+  no calcula diferencias científicas ni una matriz de cambio 2021–2023.
+- Reutiliza los motores existentes de fragmentación y conectividad y su caché efímera,
+  sin modificar fórmulas, pesos ni umbrales.
+- Corrige el ajuste del mapa al área del resultado después de redimensionar las tres
+  columnas y conserva las pestañas como navegación visual sin recalcular análisis.
+- Separa las dependencias del contenedor Flask en `requirements-web.txt`; Streamlit se
+  mantiene únicamente como respaldo histórico fuera de la imagen web.
+- Incorpora documentación reproducible, catálogo de datos y matriz de auditoría. Esta
+  versión permanece local: no implica publicación, despliegue ni fusión con `main`.
+
 ## [5.3.0] - 2026-11-01 — diseño exacto del portal y límites locales
 
 - Sustituye la interpretación visual anterior por la composición del HTML entregado:

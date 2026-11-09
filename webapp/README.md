@@ -1,4 +1,4 @@
-# Geoportal CHCP 2.0 · versión HTML
+# Geoportal CHCP · aplicación web HTML
 
 Esta aplicación Flask conserva `app.py` como alternativa Streamlit y reutiliza
 los motores científicos de `analisis_temporal.py`, `bosque_conectividad.py`,

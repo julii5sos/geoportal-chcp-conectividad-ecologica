@@ -67,7 +67,7 @@ Pendiente de autorización administrativa:
 | `projects/JRC/TMF/v1_2025/AnnualChanges` | Público JRC | Sin migración; lectura e integración 2020–2025 verificadas con el proyecto nuevo. |
 | `projects/sat-io/open-datasets/landcover/ESRI_Global-LULC_10m_TS` | Público ESRI | Sin migración; el algoritmo no fue modificado. |
 | `USGS/SRTMGL1_003` | Público USGS | Sin migración; prueba mínima de conexión. |
-| `EE_ASSET_BOSQUE_2021` | Privado institucional | Compartir con la cuenta de servicio o migrar a `projects/geoportal-513817/assets/...`. Necesario para la fragmentación/conectividad institucional de 2021. |
+| `SINIA_2021_FOREST_ASSET` | `projects/geoportal-513817/assets/SINIA_2021_COBERTURA_GENERAL_VECTOR` | Valor predeterminado del motor web. La identidad de ejecución necesita lectura del asset. |
 | `EE_ASSET_FINCAS` | Privado, legado opcional | La interfaz pública ya no ofrece fincas. Migrar solo si se decide conservar el flujo administrativo legado. |
 | Cuenca y subcuencas CHCP | GeoJSON local | No requiere permisos de Earth Engine. |
 | Corredores y puntos críticos | Datos locales públicos | No requiere permisos de Earth Engine. |
