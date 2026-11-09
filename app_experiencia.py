@@ -16,7 +16,6 @@ import requests
 import streamlit as st
 from streamlit.errors import StreamlitSecretNotFoundError
 from folium.plugins import Draw, Fullscreen
-from google.oauth2 import service_account
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -33,6 +32,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 from streamlit_folium import st_folium
+
+from gee_config import inicializar_earth_engine, resolver_proyecto_gee
 
 from bosque_conectividad import (
     agregar_resultados_fragmentacion,
@@ -1161,7 +1162,7 @@ COLORES_CONECTIVIDAD = {
     "Separados": "#E76F51",
 }
 METHODOLOGY_VERSION = "MT-2026.17-PORTAL-ERI-INDICATIVO"
-PROYECTO_EE = secreto_opcional("EE_PROJECT", "ee-julissaguevaravega")
+PROYECTO_EE = resolver_proyecto_gee(secret_getter=secreto_opcional)
 FUENTE_BOSQUE_NOMBRE = "Bosque y otros usos"
 FUENTE_BOSQUE_ORGANIZACION = "SINIA–MiAMBIENTE"
 ANO_BOSQUE_REFERENCIA = 2021
@@ -1175,7 +1176,9 @@ RADIO_BUSQUEDA_CORREDOR_M = 5_000
 TOLERANCIA_GEOMETRIA_CONECTIVIDAD_M = 10
 
 ASSET_FINCAS = secreto_opcional("EE_ASSET_FINCAS")
-ASSET_BOSQUE_2021 = secreto_opcional("EE_ASSET_BOSQUE_2021")
+ASSET_BOSQUE_2021 = secreto_opcional("EE_ASSET_BOSQUE_2021") or (
+    "projects/geoportal-513817/assets/SINIA_2021_COBERTURA_GENERAL_VECTOR"
+)
 ACCESO_FINCA_DURACION_SEG = 30 * 60
 ACCESO_FINCA_MAX_INTENTOS = 5
 ACCESO_FINCA_BLOQUEO_SEG = 60
@@ -1861,24 +1864,7 @@ def construir_registro_metodologico(
 
 @st.cache_resource
 def iniciar_earth_engine():
-    secreto = secreto_opcional("EE_SERVICE_ACCOUNT_JSON")
-    if secreto is None:
-        raise RuntimeError(
-            "Falta EE_SERVICE_ACCOUNT_JSON en los secretos de esta aplicación."
-        )
-    if isinstance(secreto, str):
-        informacion = json.loads(secreto)
-    else:
-        informacion = dict(secreto)
-    credenciales = service_account.Credentials.from_service_account_info(
-        informacion,
-        scopes=[
-            "https://www.googleapis.com/auth/earthengine",
-            "https://www.googleapis.com/auth/cloud-platform",
-        ],
-    )
-    ee.Initialize(credentials=credenciales, project=PROYECTO_EE)
-    return True
+    return inicializar_earth_engine(ee, secret_getter=secreto_opcional)
 
 
 def acceso_fincas_vigente():

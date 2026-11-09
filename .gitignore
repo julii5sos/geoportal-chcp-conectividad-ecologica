@@ -2,8 +2,13 @@ __pycache__/
 *.py[cod]
 .streamlit/secrets.toml
 .venv/
+.audit_deps/
+.audit_streamlit163/
+.test_deps/
 uploads/
 *.zip
 *.log
 output/
 tmp/
+.reference_html_original/
+deploy/cloud-run-service.yaml

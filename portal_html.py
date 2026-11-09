@@ -22,7 +22,19 @@ CSS_PORTAL_HTML = r"""
 html,body,[data-testid="stAppViewContainer"],.stApp{font-family:var(--portal-font)!important;background:#fff!important;color:var(--ink)!important;}
 [data-testid="stHeader"]{height:0!important;min-height:0!important;background:transparent!important;}
 [data-testid="stToolbar"],[data-testid="stDecoration"],#MainMenu,footer{display:none!important;}
-.block-container{max-width:none!important;padding:calc(var(--nav-h) + 12px) 14px 14px!important;}
+/* Streamlit conserva el estado colapsado del panel entre recargas. El botón
+   nativo vive dentro del encabezado, que aquí se reduce a cero para copiar el
+   HTML de referencia; por eso debe tener una posición y un tamaño propios. */
+[data-testid="stExpandSidebarButton"]{
+  position:fixed!important;top:calc(var(--nav-h) + 8px)!important;left:8px!important;
+  z-index:120!important;display:flex!important;visibility:visible!important;
+  width:44px!important;height:44px!important;min-height:44px!important;
+  align-items:center!important;justify-content:center!important;opacity:1!important;
+  border:1px solid var(--azul-linea)!important;border-radius:50%!important;
+  background:#fff!important;color:var(--azul)!important;box-shadow:var(--portal-shadow)!important;
+}
+.block-container{max-width:none!important;padding:calc(var(--nav-h) - 30px) 14px 14px!important;}
+.block-container>div:first-child{gap:0!important;}
 .block-container [data-testid="stVerticalBlock"]{gap:10px;}
 button,select,input,textarea{font-family:var(--portal-font)!important;}
 button,[role="button"]{min-height:44px;}
@@ -93,6 +105,14 @@ button,[role="button"]{min-height:44px;}
 .ref-selector-entry h2{margin:0;color:var(--azul)!important;font-size:22px;}
 .ref-selector-entry p{max-width:70ch;margin:7px 0 0;color:var(--muted)!important;line-height:1.55;}
 .ref-selector-entry .ref-btn{flex:none;background:var(--azul);color:#fff!important;}
+.ref-panel-resumen{min-height:430px;margin:0;padding:42px 42px 34px;background:var(--azul);color:#fff;}
+.ref-panel-resumen>small{color:var(--verde)!important;font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;}
+.ref-panel-resumen h2{max-width:14ch;margin:12px 0 16px;color:#fff!important;font-size:clamp(28px,3vw,42px);font-weight:500;line-height:1.12;}
+.ref-panel-resumen p{max-width:50ch;color:#e3ebf7!important;line-height:1.6;}
+.ref-panel-datos{display:grid;grid-template-columns:repeat(3,1fr);margin:24px 0;border-top:1px solid rgba(255,255,255,.25);border-bottom:1px solid rgba(255,255,255,.25);}
+.ref-panel-datos>div{padding:13px 10px 13px 0;}.ref-panel-datos>div+div{padding-left:12px;border-left:1px solid rgba(255,255,255,.2);}
+.ref-panel-datos span{display:block;color:#c9d8ec!important;font-size:9px;font-weight:700;text-transform:uppercase;}.ref-panel-datos b{display:block;margin-top:4px;color:#fff!important;font-size:13px;}
+.st-key-mapa-resumen-inicio iframe{height:430px!important;border-radius:0!important;}
 
 /* Selector modal: reproduce el asistente del HTML de referencia. */
 div[role="dialog"]{border-radius:10px!important;overflow:hidden!important;}
@@ -161,7 +181,7 @@ iframe[title="streamlit_folium.st_folium"]{display:block;border:0!important;bord
 @media(max-width:1240px){.ref-links{display:none}.ref-main-row{gap:12px}.ref-nav-btns{margin-left:auto}.ref-nav-btns>.ref-btn-w{display:none}.ref-mobile-menu{display:block}}
 @media(max-width:900px){
   :root{--nav-h:76px}.ref-util{display:none}.ref-main-row{height:76px}.ref-nav-in{padding:0 16px}.ref-wm b{font-size:18px}.ref-wm small{font-size:7.5px}.ref-lang{display:none}
-  .block-container{padding:calc(var(--nav-h) + 8px) 10px 12px!important}
+  .block-container{padding:calc(var(--nav-h) - 22px) 10px 12px!important}
   .block-container:has(.mapa-cabecera){padding-top:26px!important}
   [data-testid="stSidebar"]{top:var(--nav-h)!important;height:calc(100vh - var(--nav-h))!important;flex-basis:min(340px,100vw)!important;width:min(340px,100vw)!important;min-width:min(340px,100vw)!important;max-width:min(340px,100vw)!important}
   [data-testid="stSidebar"]>div:first-child{width:min(340px,100vw)!important}
@@ -169,6 +189,7 @@ iframe[title="streamlit_folium.st_folium"]{display:block;border:0!important;bord
   [data-testid="stSidebar"] .st-key-acciones_sidebar{width:min(340px,100vw)}
   .ref-hero{margin:-8px -10px 0;min-height:420px}.ref-meta{grid-template-columns:1fr 1fr}.ref-meta>div+div{border-left:0;border-top:1px solid var(--azul-linea)}
   .ref-modes{margin:0 -10px;padding:24px 16px 32px}.ref-mode-cards{grid-template-columns:1fr}.ref-mode-card{min-height:0}.ref-selector-entry{align-items:stretch;flex-direction:column}.ref-selector-entry .ref-btn{width:100%}
+  .ref-panel-resumen{min-height:0;padding:28px 22px}.ref-panel-datos{grid-template-columns:1fr}.ref-panel-datos>div+div{padding-left:0;border-left:0;border-top:1px solid rgba(255,255,255,.2)}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important;}}
 </style>
@@ -212,11 +233,12 @@ def mostrar_navegacion_portal(seccion: str) -> None:
             <div class="ref-main-row">
               <a class="ref-wm" href="?seccion=inicio" target="_self" aria-label="Inicio · Conectividad Panamá">{LOGO_PORTAL}<span><b>Conectividad Panamá</b><small>Cuenca del Canal de Panamá</small></span></a>
               <nav class="ref-links" aria-label="Secciones">
-                <a href="?seccion=explorar{sufijo_modo}" target="_self"{actual('explorar')}>Explorar</a>
-                <a href="?seccion=comparar{sufijo_modo}" target="_self"{actual('comparar')}>Comparar</a>
-                <a href="?seccion=analizar{sufijo_modo}" target="_self"{actual('analizar')}>Analizar</a>
-                <a href="?seccion=eri{sufijo_modo}" target="_self"{actual('eri')}>ERI</a>
-                <a href="?seccion=resultados{sufijo_modo}" target="_self"{actual('resultados')}>Resultados</a>
+                <a href="?seccion=inicio" target="_self"{actual('inicio')}>Conoce la herramienta <i class="ref-chev"></i></a>
+                <a href="?seccion=resultados{sufijo_modo}" target="_self"{actual('resultados')}>Panel <i class="ref-chev"></i></a>
+                <a href="?seccion=explorar{sufijo_modo}" target="_self"{actual('explorar')}>Plataforma <i class="ref-chev"></i></a>
+                <a href="?seccion=metodo" target="_self"{actual('metodo')}>Uso de datos <i class="ref-chev"></i></a>
+                <a href="?seccion=metodo" target="_self">Tutoriales <i class="ref-chev"></i></a>
+                <a href="?seccion=acerca" target="_self"{actual('acerca')}>FAQ <i class="ref-chev"></i></a>
               </nav>
               <div class="ref-nav-btns">
                 <a class="ref-btn ref-btn-w" href="?seccion=explorar{sufijo_modo}" target="_self">Explorar datos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>

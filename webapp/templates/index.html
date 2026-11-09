@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hero %}
+{% block title %}Geoportal de Conectividad Ecológica de la CHCP{% endblock %}
+{% block body %}
+<main>
+  {% call hero('Geoportal de Conectividad Ecológica de la Cuenca Hidrográfica del Canal de Panamá', 'Una preevaluación reproducible para explorar señales territoriales, cobertura, fragmentación, corredores y conectividad estructural.') %}
+    <div class="territory-search" id="territory-search">
+      <label for="territory-query">Buscar cuenca o subcuenca</label>
+      <div class="territory-search-box">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+        <input id="territory-query" type="search" autocomplete="off" placeholder="Ejemplo: Miraflores, Chagres o CHCP" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="territory-results">
+        <span class="search-spinner" id="territory-search-spinner" hidden aria-hidden="true"></span>
+      </div>
+      <div class="territory-results" id="territory-results" role="listbox" hidden></div>
+      <p class="territory-search-status" id="territory-search-status" role="status">Busque entre la CHCP y {{ subbasin_count }} subcuencas reales.</p>
+    </div>
+    <a class="btn btn-o" href="{{ url_for('methodology') }}">Conocer el método</a>
+  {% endcall %}
+  <section class="sec home-summary">
+    <div class="wrap home-grid">
+      <div class="home-copy">
+        <span class="eyebrow">Panel territorial</span>
+        <h2>Cuenca Hidrográfica del Canal de Panamá</h2>
+        <p>Seleccione un polígono, una de las {{ subbasin_count }} subcuencas disponibles o toda la CHCP. El motor compara períodos equivalentes sin convertir una selección visual en un resultado científico ficticio.</p>
+        <div class="meta home-meta">
+          <div><span>Fuentes temporales</span><b>JRC · ESRI</b></div>
+          <div><span>Proyecto GEE</span><b>{{ project_id }}</b></div>
+          <div><span>Resultado</span><b>Indicativo</b></div>
+        </div>
+        <a class="btn btn-p" href="{{ url_for('platform') }}">Explorar la CHCP</a>
+      </div>
+      <div id="home-map" class="home-map" aria-label="Mapa de la Cuenca Hidrográfica del Canal de Panamá"></div>
+    </div>
+  </section>
+  <section class="sec gris"><div class="wrap"><div class="sec-c"><h2>Un flujo único, cuatro lecturas</h2><p>El mapa permanece como centro de atención; los resultados aparecen únicamente después de ejecutar.</p></div><div class="cards module-cards">
+    <article class="card"><span class="date">01</span><h3>Cobertura</h3><p>Bosque, no bosque y transiciones sobre la máscara válida común.</p></article>
+    <article class="card"><span class="date">02</span><h3>Fragmentación</h3><p>Número de parches, tamaño medio, densidad y borde.</p></article>
+    <article class="card"><span class="date">03</span><h3>Conectividad</h3><p>Componentes, aislamiento y relaciones estructurales bajo un umbral común.</p></article>
+    <article class="card"><span class="date">Complementario</span><h3>ERI</h3><p>Lectura independiente con los pesos originales; no altera las métricas temporales.</p></article>
+  </div></div></section>
+  <section class="sec home-decisions"><div class="wrap"><div class="sec-c"><span class="eyebrow">Comience aquí</span><h2>Una entrada clara para cada necesidad</h2><p>La portada resume el propósito. Los detalles científicos y de datos quedan en sus secciones específicas.</p></div><div class="access-grid"><a href="{{ url_for('panel') }}"><span>01</span><b>Consultar el Panel</b><small>Resultados disponibles, gráficas, capas y contexto espacial.</small></a><a href="{{ url_for('platform') }}"><span>02</span><b>Crear un análisis</b><small>Dibuje o seleccione un territorio y configure el cálculo.</small></a><a href="{{ url_for('methodology') }}"><span>03</span><b>Revisar metodología y datos</b><small>Fuentes, períodos, leyendas, fórmulas y limitaciones.</small></a></div></div></section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/home.js') }}"></script>{% endblock %}
+

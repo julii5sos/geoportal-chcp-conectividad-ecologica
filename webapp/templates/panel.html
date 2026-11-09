@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Panel territorial · Geoportal de Conectividad Ecológica de la CHCP{% endblock %}
+{% block body %}
+<main class="territory-panel-page" id="territory-panel" data-project="{{ project_id }}">
+  <section class="territory-panel-work wrap">
+    <div class="panel-results-map-grid">
+      <section class="panel-results-column" aria-label="Indicadores del territorio">
+        <header class="panel-context-head">
+          <div class="panel-context-title">
+            <span>Panel ecológico territorial · referencia 2025</span>
+            <h1 id="panel-territory-name">Seleccione un territorio</h1>
+            <p id="panel-territory-group">Resultados disponibles y contexto cartográfico, sin recalcular al navegar.</p>
+          </div>
+          <div class="panel-head-actions">
+            <button class="btn btn-w" id="panel-analyze" type="button">Explorar mapa</button>
+            <a class="btn btn-accent" id="panel-custom-analysis" href="{{ url_for('platform') }}">Ejecutar análisis</a>
+          </div>
+        </header>
+        <div class="territory-picker" aria-label="Selección territorial">
+          <div class="territory-picker-row"><label for="panel-search">Territorio analizado</label><button class="panel-draw-link" id="panel-draw" type="button">Dibujar área</button></div>
+          <input id="panel-search" type="search" autocomplete="off" placeholder="Buscar cuenca o subcuenca" role="combobox" aria-expanded="false" aria-controls="panel-search-results">
+          <div id="panel-search-results" class="territory-results compact" role="listbox" hidden></div>
+          <div class="territory-facts" id="territory-facts" aria-live="polite"></div>
+        </div>
+        <div class="result-provenance" id="result-provenance" hidden></div>
+        <div class="territory-kpis" id="territory-kpis"></div>
+        <nav class="territory-tabs" role="tablist" aria-label="Temas del análisis">
+          {% for key, label in [('summary','Resumen'),('coverage','Cobertura y cambio'),('structure','Fragmentación y conectividad'),('corridors','Corredores'),('interpretation','Interpretación e informe')] %}
+          <button type="button" role="tab" data-territory-tab="{{ key }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ label }}</button>
+          {% endfor %}
+        </nav>
+        <label class="panel-more-analysis" for="panel-more-analysis"><span>Análisis complementarios</span><select id="panel-more-analysis"><option value="">Seleccione una vista</option><option value="temporal">Comparación temporal</option><option value="concordance">Concordancia JRC + ESRI</option><option value="official">Coberturas de Panamá</option><option value="eri">ERI complementario</option></select></label>
+        <section class="territory-tab-view" id="territory-tab-view"></section>
+      </section>
+      <aside class="panel-map-shell" aria-label="Contexto cartográfico del análisis">
+        <div class="panel-map-heading"><div><span>Contexto espacial</span><b id="panel-map-theme">Resumen territorial</b></div><button type="button" id="panel-fit-territory">Ver territorio completo</button></div>
+        <div id="panel-map" class="territory-panel-map" aria-label="Mapa del territorio seleccionado"></div>
+        <aside class="panel-map-layers" aria-label="Capas visibles"><strong id="panel-layer-title">Capas del análisis</strong><div id="panel-theme-layers" class="panel-theme-layers"></div><label><input id="panel-layer-territory" type="checkbox" checked> Límite territorial</label><label><input id="panel-layer-context" type="checkbox" checked> <span id="panel-layer-context-label">Contexto publicado</span></label><label><input id="panel-layer-results" type="checkbox" checked> Resultado disponible</label><div id="panel-map-legend" class="panel-map-legend" aria-live="polite"></div><label for="panel-map-opacity">Opacidad <output id="panel-map-opacity-value">78 %</output></label><input id="panel-map-opacity" type="range" min="25" max="100" value="78"></aside>
+      </aside>
+    </div>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/panel.js') }}"></script>{% endblock %}

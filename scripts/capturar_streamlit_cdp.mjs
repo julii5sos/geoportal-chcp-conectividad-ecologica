@@ -81,6 +81,17 @@ if (!texto.includes(textoEsperado)) {
 
 await evaluar("document.fonts?.ready || Promise.resolve()");
 await esperar(5_000);
+const selectorClick = process.env.CDP_CLICK_SELECTOR;
+if (selectorClick) {
+  const encontrado = await evaluar(`(() => {
+    const elemento = document.querySelector(${JSON.stringify(selectorClick)});
+    if (!elemento) return false;
+    elemento.click();
+    return true;
+  })()`);
+  if (!encontrado) throw new Error(`No se encontró el selector para la captura: ${selectorClick}`);
+  await esperar(Number(process.env.CDP_AFTER_CLICK_MS || 1_000));
+}
 const captura = await enviar("Page.captureScreenshot", {
   format: "png",
   fromSurface: true,

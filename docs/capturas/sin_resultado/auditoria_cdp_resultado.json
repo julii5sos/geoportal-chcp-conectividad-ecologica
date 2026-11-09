@@ -1,0 +1,306 @@
+{
+  "url": "http://127.0.0.1:8090/platform?territory=subcuenca%3Aqda-bonita",
+  "initial": {
+    "title": "Plataforma · Geoportal de Conectividad Ecológica de la CHCP",
+    "viewport": {
+      "width": 1894,
+      "height": 980,
+      "deviceScaleFactor": 1
+    },
+    "document": {
+      "scrollWidth": 1894,
+      "scrollHeight": 980
+    },
+    "overflowX": false,
+    "columns": {
+      "left": true,
+      "map": true,
+      "results": true
+    },
+    "resultsTitle": "Qda. Bonita",
+    "resultsSubtitle": "Subcuenca de la CHCP · listo para explorar",
+    "selectedResultTab": null,
+    "resultTabs": [],
+    "toggles": 8,
+    "activeToggles": 3,
+    "mapPaths": 0,
+    "scale": "1 km",
+    "charts": [],
+    "pdfHref": null,
+    "downloadHref": null
+  },
+  "interactions": {
+    "forestClick": false,
+    "forest": {
+      "title": "Plataforma · Geoportal de Conectividad Ecológica de la CHCP",
+      "viewport": {
+        "width": 1894,
+        "height": 980,
+        "deviceScaleFactor": 1
+      },
+      "document": {
+        "scrollWidth": 1894,
+        "scrollHeight": 980
+      },
+      "overflowX": false,
+      "columns": {
+        "left": true,
+        "map": true,
+        "results": true
+      },
+      "resultsTitle": "Qda. Bonita",
+      "resultsSubtitle": "Subcuenca de la CHCP · listo para explorar",
+      "selectedResultTab": null,
+      "resultTabs": [],
+      "toggles": 8,
+      "activeToggles": 3,
+      "mapPaths": 0,
+      "scale": "1 km",
+      "charts": [],
+      "pdfHref": null,
+      "downloadHref": null
+    },
+    "connectivityClick": false,
+    "connectivity": {
+      "title": "Plataforma · Geoportal de Conectividad Ecológica de la CHCP",
+      "viewport": {
+        "width": 1894,
+        "height": 980,
+        "deviceScaleFactor": 1
+      },
+      "document": {
+        "scrollWidth": 1894,
+        "scrollHeight": 980
+      },
+      "overflowX": false,
+      "columns": {
+        "left": true,
+        "map": true,
+        "results": true
+      },
+      "resultsTitle": "Qda. Bonita",
+      "resultsSubtitle": "Subcuenca de la CHCP · listo para explorar",
+      "selectedResultTab": null,
+      "resultTabs": [],
+      "toggles": 8,
+      "activeToggles": 3,
+      "mapPaths": 0,
+      "scale": "1 km",
+      "charts": [],
+      "pdfHref": null,
+      "downloadHref": null
+    },
+    "toggleResult": {
+      "found": true,
+      "before": {
+        "checked": true,
+        "paths": 0
+      },
+      "disabled": {
+        "checked": false,
+        "paths": 0
+      },
+      "restored": {
+        "checked": true,
+        "paths": 0
+      }
+    },
+    "leftTabs": {
+      "filters": {
+        "selected": "true",
+        "visible": true
+      },
+      "basemaps": {
+        "selected": "true",
+        "visible": true
+      },
+      "layers": {
+        "selected": "true",
+        "visible": true
+      }
+    },
+    "wizard": {
+      "visible": true,
+      "title": "Realizar análisis",
+      "stepLabels": [
+        "1Análisis",
+        "2Área",
+        "3Parámetros",
+        "4Revisión"
+      ],
+      "options": [
+        "ecological",
+        "fragmentation",
+        "connectivity"
+      ]
+    },
+    "analyticalRequestsTriggeredByTabs": 0
+  },
+  "diagnostics": {
+    "failedRequests": [
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "url": null,
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      }
+    ],
+    "badResponses": [],
+    "consoleMessages": [],
+    "exceptions": []
+  },
+  "screenshots": {
+    "initialScreenshot": "C:\\Users\\julis\\OneDrive\\Documentos\\00_prototipo\\geoportal-chcp-conectividad-ecologica\\docs\\capturas\\sin_resultado\\auditoria_cdp_resumen.png",
+    "forestScreenshot": "C:\\Users\\julis\\OneDrive\\Documentos\\00_prototipo\\geoportal-chcp-conectividad-ecologica\\docs\\capturas\\sin_resultado\\auditoria_cdp_dinamica_bosque.png",
+    "connectivityScreenshot": "C:\\Users\\julis\\OneDrive\\Documentos\\00_prototipo\\geoportal-chcp-conectividad-ecologica\\docs\\capturas\\sin_resultado\\auditoria_cdp_conectividad.png"
+  }
+}

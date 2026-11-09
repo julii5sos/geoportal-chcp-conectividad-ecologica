@@ -1,4 +1,7 @@
-streamlit>=1.63,<2
+# 1.66.1 bloquea las pruebas AppTest de navegación de este portal. La versión
+# 1.63.0 es la versión auditada en escritorio y mantiene el comportamiento
+# esperado del panel lateral y los componentes personalizados.
+streamlit==1.63.0
 altair>=6,<7
 reportlab>=4.2,<5
 earthengine-api>=1.5,<2
@@ -9,3 +12,6 @@ networkx>=3.2,<4
 pyproj>=3.6,<4
 pyshp>=2.3,<4
 shapely>=2.0,<3
+flask>=3.1,<4
+pydantic>=2.7,<3
+gunicorn>=23,<24; platform_system != "Windows"

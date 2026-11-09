@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Plataforma · Geoportal de Conectividad Ecológica de la CHCP{% endblock %}
+{% block body %}
+<main id="v-plataforma" data-project="{{ project_id }}">
+  <aside class="side" id="left-panel">
+    <div class="side-tabs" role="tablist" aria-label="Panel cartográfico">
+      <button role="tab" data-panel="layers" aria-selected="true">Capas</button>
+      <button role="tab" data-panel="filters" aria-selected="false">Filtros</button>
+      <button role="tab" data-panel="basemaps" aria-selected="false">Mapa base</button>
+    </div>
+    <div class="side-body" id="panel-layers"></div>
+    <div class="side-body" id="panel-filters" hidden>
+      <section class="filter-block"><h3>Área preparada</h3><p id="filter-area-label">Dibuje un polígono o use el asistente para seleccionar una unidad territorial.</p><p class="hint" id="selected-territory-id"></p></section>
+      <section class="filter-block"><h3>Fragmentación y conectividad</h3><label for="quick-distance">Distancia máxima entre parches</label><select id="quick-distance"><option>100</option><option>250</option><option selected>500</option><option>750</option><option>1000</option><option>1500</option><option>2000</option></select><span class="hint">Metros entre bordes. Solo se aplica cuando selecciona Fragmentación, Conectividad o Análisis integral.</span></section>
+      <section class="filter-block"><h3>Visualización</h3><label for="layer-opacity">Opacidad de resultados <output id="layer-opacity-value">76 %</output></label><input id="layer-opacity" type="range" min="20" max="100" step="5" value="76"><span class="hint">Solo modifica la visualización; no recalcula el análisis.</span></section>
+      <section class="filter-block"><h3>Cómo ejecutar</h3><p class="hint">Elija uno o varios componentes desde Realizar análisis. El Panel territorial explica las fuentes, períodos y productos disponibles sin iniciar cálculos.</p></section>
+    </div>
+    <div class="side-body" id="panel-basemaps" hidden><div class="bm" id="basemap-list"></div><p class="hint-p small">El mapa base solo cambia la visualización y nunca recalcula resultados.</p></div>
+    <div class="side-foot"><button class="btn btn-p" id="open-analysis" type="button">Realizar análisis</button><button class="btn btn-s" id="reset-platform" type="button">Restablecer</button><button id="download-result" type="button" hidden disabled>Descargas</button></div>
+  </aside>
+  <section class="pmap2" aria-label="Mapa de evidencia cartográfica">
+    <div id="smap"></div>
+    <div class="drawbar" id="drawbar" hidden><b>Dibujando polígono</b><span id="draw-count">0 vértices</span><button class="btn btn-s" id="draw-undo" type="button">Deshacer</button><button class="btn btn-p" id="draw-finish" type="button">Terminar</button><button class="btn btn-s" id="draw-cancel" type="button">Cancelar</button></div>
+    <button class="btn btn-s panel-toggle" id="left-toggle" type="button" aria-label="Ocultar panel de controles">‹</button>
+    <button class="btn btn-s res-tab" id="results-reopen" type="button" hidden>Resultados ‹</button>
+    <div class="maplegend" id="map-legend" hidden></div>
+    <div class="coords" id="coords">lat — · lon —</div>
+    <div class="busy" id="busy" hidden><div class="busy-c"><b id="busy-title">Procesando</b><div class="bar"><i id="busy-bar"></i></div><ul class="steps-l" id="busy-steps"></ul><p>La solicitud permanece abierta mientras Earth Engine calcula el resultado real.</p></div></div>
+  </section>
+  <aside class="res" id="results-panel" aria-label="Resultados científicos">
+    <div class="res-h"><div><span class="eyebrow">Resultados científicos</span><h2 id="results-title">Territorio preparado</h2><p id="results-subtitle">Los resultados reales aparecerán aquí sin ocultar el mapa.</p></div><button class="xbtn" id="results-close" type="button" aria-label="Abrir metodología y alcance" title="Metodología y alcance">i</button></div>
+    <div class="scientific-result-navigation" id="results-navigation" hidden></div>
+    <div class="res-b" id="results-body"><div class="empty-result scientific-empty"><h3>No calculado</h3><p>Seleccione el área y ejecute una preevaluación, fragmentación, conectividad o análisis integral. Las capas de exploración pueden activarse sin recalcular.</p><button class="btn btn-p" type="button" data-open-analysis>Realizar análisis</button></div></div>
+  </aside>
+</main>
+
+<div class="modal" id="analysis-modal" hidden role="dialog" aria-modal="true" aria-labelledby="analysis-title">
+  <div class="dlg">
+    <div class="dlg-h"><h2 id="analysis-title">Realizar análisis</h2><button class="xbtn" id="modal-close" type="button" aria-label="Cerrar">×</button></div>
+    <div class="dlg-b"><ol class="stp" id="wizard-steps"></ol><div class="dlg-c" id="wizard-body"></div></div>
+    <div class="dlg-f"><span class="err" id="wizard-error" role="alert"></span><button class="btn btn-s" id="wizard-back" type="button">Atrás</button><button class="btn btn-p" id="wizard-next" type="button">Siguiente</button></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/platform.js') }}"></script>{% endblock %}
+
